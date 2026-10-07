@@ -1,3 +1,7 @@
+import os
+
+os.environ["TASK_BROKER"] = "memory"  # before app imports: tasks run inline (ADR-0004)
+
 from collections.abc import Iterator
 from pathlib import Path
 

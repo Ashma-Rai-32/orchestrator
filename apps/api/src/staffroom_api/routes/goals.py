@@ -1,20 +1,17 @@
 import uuid
 from datetime import datetime
-from functools import partial
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, WebSocket, status
+from fastapi import APIRouter, HTTPException, Request, WebSocket, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from staffroom_api import event_stream
 from staffroom_api.agents.events import TeamEvent, team_event
-from staffroom_api.agents.models import chat_model
-from staffroom_api.agents.team import EmployeeSpec, build_team
 from staffroom_api.db.models import Employee, Event, Run
 from staffroom_api.db.tenancy import tenant_transaction
 from staffroom_api.deps import TenantId, TenantSession
-from staffroom_api.runs import execute_run
+from staffroom_api.worker import run_segment
 
 router = APIRouter(tags=["runs"])
 
@@ -39,32 +36,19 @@ class EventOut(BaseModel):
 
 
 @router.post("/goals", status_code=status.HTTP_202_ACCEPTED)
-async def start_run(
-    body: GoalCreate, tenant_id: TenantId, request: Request, background: BackgroundTasks
-) -> RunOut:
-    """Start a run for the tenant's whole team; returns at once with the run id.
-
-    The run executes after the response (FastAPI BackgroundTasks, same process).
-    Increment 4 moves it to a worker + checkpointer so it survives restarts.
-    """
-    engine = request.app.state.db
-    async with tenant_transaction(engine, tenant_id) as conn:
+async def start_run(body: GoalCreate, tenant_id: TenantId, request: Request) -> RunOut:
+    """Create a run and enqueue it for a worker (ADR-0004); returns at once."""
+    async with tenant_transaction(request.app.state.db, tenant_id) as conn:
         session = AsyncSession(bind=conn, expire_on_commit=False)
-        employees = [
-            EmployeeSpec(name=e.name, skills=e.skills)
-            for e in await session.scalars(select(Employee))
-        ]
-        if not employees:
+        if (await session.scalar(select(Employee.id).limit(1))) is None:
             raise HTTPException(status.HTTP_409_CONFLICT, "Hire at least one employee first.")
         run = Run(tenant_id=tenant_id, goal=body.goal, status="queued")
         session.add(run)
         await session.flush()
         await session.refresh(run)
 
-    model_name = request.app.state.settings.staffroom_model
-    team = build_team(employees, model=partial(chat_model, model_name))
-    redis = request.app.state.redis
-    background.add_task(execute_run, engine, redis, tenant_id, run.id, team, body.goal)
+    # After commit, so the worker always finds the run row.
+    await run_segment.kiq(str(tenant_id), str(run.id))
     return _run_out(run)
 
 

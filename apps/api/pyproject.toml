@@ -14,6 +14,8 @@ dependencies = [
     "langchain>=1.4.3",
     "langgraph>=1.2.14",
     "langchain-anthropic>=1.7.5",  # provider packages are only used via init_chat_model
+    "taskiq>=0.13.0",
+    "taskiq-redis>=1.2.4",
 ]
 
 [dependency-groups]

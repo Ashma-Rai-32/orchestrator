@@ -33,6 +33,10 @@ select = [
     "RUF",
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+# Framework dependency markers are meant to be used as argument defaults.
+extend-immutable-calls = ["taskiq.TaskiqDepends", "fastapi.Depends", "fastapi.Query"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["staffroom_api"]
 

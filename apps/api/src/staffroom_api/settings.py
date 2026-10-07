@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,6 +28,12 @@ class Settings(BaseSettings):
 
     # "fake" (deterministic, no key) or "<provider>:<pinned model id>" for init_chat_model.
     staffroom_model: str = "fake"
+
+    # Task queue (ADR-0004). "memory" runs tasks inline (tests).
+    task_broker: Literal["redis", "memory"] = "redis"
+    # A run segment must finish before its message can be re-claimed by another worker.
+    run_segment_timeout_seconds: int = 30 * 60
+    redelivery_after_seconds: int = 35 * 60
 
     def _pg_url(self, user: str, password: SecretStr) -> str:
         return (

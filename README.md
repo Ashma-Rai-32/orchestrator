@@ -65,7 +65,8 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Alembic migrations, tenants + employees with RLS (M0) | Real | Isolation proven by tests against real Postgres ([ADR-0005](docs/adr/0005-tenant-isolation-with-postgres-rls.md)) |
 | Skill catalog, tenants, hire/list employees API (M1) | Real | Tested over HTTP against Postgres with RLS |
 | Team builder + `POST /goals` (M1) | Real, **fake model** | Coordinator + skill pools (ADR-0007); no real LLM yet |
-| Runs + event log (M1) | Real | `POST /goals` returns 202; events stored per tenant with RLS. Runs execute in-process (**lost on restart** until the worker lands) |
+| Runs + event log (M1) | Real | `POST /goals` returns 202; events stored per tenant with RLS |
+| Background worker (M1) | Real | Taskiq on Redis Streams ([ADR-0004](docs/adr/0004-task-queue-taskiq.md)); a dead worker's run is re-delivered. **Resume from checkpoint not yet**: a re-delivered run restarts from the beginning |
 | Live event stream (M1) | Real | WebSocket `/runs/{id}/stream`: replay + live via Redis Streams, Postgres fallback |
 | Auth (M0) | **Stubbed** | Tenant comes from an `X-Tenant-ID` header; do not expose publicly |
 | Agent core: skills, team builder, events (M1) | Planned | |
