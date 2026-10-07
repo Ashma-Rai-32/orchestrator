@@ -91,6 +91,11 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_BASE_URL: http://langfuse-web:3000
+      # Local models: Ollama runs natively on the host (GPU), not in Docker.
+      # Use with STAFFROOM_MODEL=ollama:qwen3.5:4b
+      OLLAMA_HOST: http://host.docker.internal:11434
+    extra_hosts:
+      - host.docker.internal:host-gateway  # also works on Linux Docker
     depends_on:
       migrate:
         condition: service_completed_successfully
