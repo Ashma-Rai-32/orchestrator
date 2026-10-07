@@ -23,7 +23,7 @@ target_metadata = Base.metadata
 
 # URL comes from app settings (env / .env), not alembic.ini, unless a caller set one.
 if config.get_main_option("sqlalchemy.url") in (None, "", "driver://user:pass@localhost/dbname"):
-    config.set_main_option("sqlalchemy.url", Settings().database_url)
+    config.set_main_option("sqlalchemy.url", Settings().migration_database_url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

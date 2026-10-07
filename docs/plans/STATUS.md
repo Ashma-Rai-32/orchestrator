@@ -14,7 +14,9 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [x] Spike `langgraph-core`: StateGraph, reducers, runtime context, v2 streaming, conditional edges, `Send` fan-out/fan-in.
 - [x] Spike `team-builder` → ADR-0007 (tool-calling coordinator, one tool per skill pool).
 - [x] Spike `checkpoint-interrupt`: pause in one process, resume in another via `PostgresSaver`; `response_schema` validates admin answers. Findings: [docs/frameworks/langgraph.md](../frameworks/langgraph.md).
-- [ ] **M0 next**: FastAPI app + health route running in compose, then Alembic + tenants + RLS with isolation tests.
+- [x] M0: FastAPI + `/health` in compose; Alembic (migrate job before API); tenants + employees; RLS with non-owner app role (ADR-0005), 7 isolation tests.
+- [ ] **M0 remaining**: auth (ADR-0003, revisit Zitadel weight), task queue ADR-0004, observability ADR-0006.
+- [ ] Then M1: skill registry, team builder from DB rows (ADR-0007), events persisted + streamed over WebSocket, fake model.
 
 Moved out of M-1: Langfuse → M0/M1, MCP + Playwright → M2, Agent Server → ADR from docs.
 

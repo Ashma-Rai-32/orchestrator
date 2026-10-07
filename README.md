@@ -62,7 +62,8 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Repo, CI, compose (Postgres, Redis, Langfuse) | Real | CI runs lint/format/secret scan only; tests arrive with M0 code |
 | Framework spikes (M-1) | Real | [docs/frameworks/](docs/frameworks/) |
 | FastAPI app + `/health` in compose (M0) | Real | Checks Postgres and Redis; tested in CI |
-| Alembic, tenants + RLS (M0) | Planned | |
+| Alembic migrations, tenants + employees with RLS (M0) | Real | Isolation proven by tests against real Postgres ([ADR-0005](docs/adr/0005-tenant-isolation-with-postgres-rls.md)) |
+| Auth (M0) | Planned | |
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox and tools (M2) | Planned | |
 | Office UI (M3) | Planned | |

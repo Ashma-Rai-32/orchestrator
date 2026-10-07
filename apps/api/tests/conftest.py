@@ -2,19 +2,27 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine, create_engine
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
+APP_ROLE, APP_PASSWORD = "staffroom_app", "app-test"
 
 
 @pytest.fixture(scope="session")
-def postgres_url() -> Iterator[str]:
+def postgres() -> Iterator[PostgresContainer]:
     """A throwaway Postgres (same major version as compose) for the whole test session."""
     with PostgresContainer(
         "postgres:17-alpine", username="test", password="test", dbname="test", driver="psycopg"
     ) as pg:
-        yield pg.get_connection_url()
+        yield pg
+
+
+def _url(pg: PostgresContainer, *, driver: str, user: str, password: str, db: str) -> str:
+    host, port = pg.get_container_host_ip(), pg.get_exposed_port(5432)
+    return f"postgresql+{driver}://{user}:{password}@{host}:{port}/{db}"
 
 
 # --- pytest-alembic fixtures (it defaults to SQLite otherwise) --------------
@@ -26,7 +34,40 @@ def alembic_config() -> dict[str, str]:
 
 
 @pytest.fixture
-def alembic_engine(postgres_url: str) -> Iterator[Engine]:
-    engine = create_engine(postgres_url)
+def alembic_engine(postgres: PostgresContainer) -> Iterator[Engine]:
+    engine = create_engine(postgres.get_connection_url())
     yield engine
     engine.dispose()
+
+
+# --- A migrated database for tenant-isolation tests -------------------------
+
+
+@pytest.fixture(scope="session")
+def rls_db(postgres: PostgresContainer) -> dict[str, str]:
+    """Separate database at head, with the app role able to log in.
+
+    Separate from pytest-alembic's database, which those tests upgrade and downgrade.
+    Returns URLs for the owner (sync, bypasses RLS) and the app role (async, RLS applies).
+    """
+    admin = create_engine(postgres.get_connection_url(), isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        conn.execute(text("CREATE DATABASE rls"))
+    admin.dispose()
+
+    owner = dict(user="test", password="test", db="rls")
+    cfg = Config(str(ALEMBIC_INI))
+    cfg.set_main_option("sqlalchemy.url", _url(postgres, driver="asyncpg", **owner))
+    command.upgrade(cfg, "head")
+
+    owner_url = _url(postgres, driver="psycopg", **owner)
+    engine = create_engine(owner_url)
+    with engine.begin() as conn:
+        # What infra (compose init script / Terraform) does in real environments.
+        conn.execute(text(f"ALTER ROLE {APP_ROLE} LOGIN PASSWORD '{APP_PASSWORD}'"))
+    engine.dispose()
+
+    return {
+        "owner": owner_url,
+        "app": _url(postgres, driver="asyncpg", user=APP_ROLE, password=APP_PASSWORD, db="rls"),
+    }

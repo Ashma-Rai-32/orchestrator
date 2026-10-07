@@ -8,11 +8,9 @@ name: staffroom
 include:
   - infra/compose/langfuse.yaml
 
-x-api-env: &api-env
+x-db-env: &db-env
   POSTGRES_HOST: postgres
   POSTGRES_PORT: "5432"
-  POSTGRES_USER: ${POSTGRES_USER:-staffroom}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staffroom}
   POSTGRES_DB: ${POSTGRES_DB:-staffroom}
   REDIS_HOST: redis
   REDIS_PORT: "6379"  # container port, not the host mapping
@@ -25,7 +23,11 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     command: ["/app/.venv/bin/alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
-    environment: *api-env
+    environment:
+      <<: *db-env
+      # Owner credentials: only the migration job gets these.
+      POSTGRES_USER: ${POSTGRES_USER:-staffroom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staffroom}
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,7 +38,11 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
-    environment: *api-env
+    environment:
+      <<: *db-env
+      # App role only: not the table owner, so row-level security applies.
+      APP_DB_USER: ${APP_DB_USER:-staffroom_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-staffroom_app}
     ports:
       - 127.0.0.1:${API_PORT:-8000}:8000
     healthcheck:  # slim image has no curl
@@ -60,12 +66,15 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-staffroom}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staffroom}
       POSTGRES_DB: ${POSTGRES_DB:-staffroom}
+      APP_DB_USER: ${APP_DB_USER:-staffroom_app}  # read by the init script
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-staffroom_app}
       TZ: UTC
       PGTZ: UTC
     ports:
       - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infra/compose/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-staffroom} -d ${POSTGRES_DB:-staffroom}"]
       interval: 3s
