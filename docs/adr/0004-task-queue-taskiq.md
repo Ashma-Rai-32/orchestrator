@@ -40,7 +40,9 @@ Option 4, Taskiq with `RedisStreamBroker`.
 
 ## Update 2026-10-07: reclaim only happens when new messages arrive
 
-Found in the crash demo and confirmed in source (taskiq-redis 1.2.4 and upstream `main`): `RedisStreamBroker.listen()` does `if not fetched: continue` *before* its `XAUTOCLAIM` block. On an idle queue, a dead worker's message is never reclaimed; it is reclaimed only after some new message arrives. Resume itself works (verified: `run_resumed` → only the summary step re-ran). Fix pending (see STATUS.md).
+Found in the crash demo and confirmed in source (taskiq-redis 1.2.4 and upstream `main`): `RedisStreamBroker.listen()` does `if not fetched: continue` *before* its `XAUTOCLAIM` block. On an idle queue, a dead worker's message is never reclaimed; it is reclaimed only after some new message arrives. Resume itself works (verified: `run_resumed` → only the summary step re-ran).
+
+Fix: `staffroom_api/broker.py`, a subclass of `RedisStreamBroker` that runs the same reclaim on every loop iteration (upstream logic, reordered). Verified live: with no new messages, a killed worker's run resumed after the idle window. `tests/test_broker.py` also asserts the upstream broker still has the bug; when that test fails, upstream is fixed and the subclass should be deleted. Upstream issue: to be filed by the maintainer.
 
 ## Sources
 

@@ -11,11 +11,11 @@ from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from taskiq import AsyncBroker, Context, InMemoryBroker, TaskiqDepends, TaskiqEvents, TaskiqState
-from taskiq_redis import RedisStreamBroker
 
 from staffroom_api.agents.checkpoints import run_checkpointer
 from staffroom_api.agents.models import chat_model
 from staffroom_api.agents.team import EmployeeSpec, build_team
+from staffroom_api.broker import ReclaimingRedisStreamBroker
 from staffroom_api.db.models import Employee, Run
 from staffroom_api.db.tenancy import tenant_transaction
 from staffroom_api.runs import execute_run
@@ -27,7 +27,7 @@ settings = Settings()
 def _make_broker(s: Settings) -> AsyncBroker:
     if s.task_broker == "memory":
         return InMemoryBroker(await_inplace=True)  # tests: the task runs inside .kiq()
-    return RedisStreamBroker(
+    return ReclaimingRedisStreamBroker(  # upstream RedisStreamBroker + reclaim fix
         s.redis_url,
         queue_name="staffroom:runs",
         idle_timeout=s.redelivery_after_seconds * 1000,  # dead worker -> re-claimed after this
