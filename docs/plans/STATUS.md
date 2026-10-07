@@ -21,7 +21,10 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [ ] M5: domain watchdog for runs stuck in `running` (option c) — also covers segment timeouts.
 - [ ] Known gap: a segment that times out (taskiq `timeout`) is cancelled with `CancelledError` (not caught) → run stays `running`. Handle with the watchdog/fix above.
 - [x] Auth (ADR-0003): Keycloak organizations = tenants, realm as code; API verifies tokens with PyJWT; WebSocket token via subprotocol. Header stub removed.
-- [ ] Next: M2 sandbox + tools (sandbox ADR first). Remaining M0 ADR: observability (Langfuse wiring, ADR-0006).
+- [x] M2: hardened Docker sandbox per run (ADR-0006), deepagents FilesystemMiddleware tools for employees, Playwright MCP inside the sandbox (docs/frameworks/playwright-mcp.md).
+- [ ] M2 next: give browser tools to employees with the `testing` skill (skill catalog `tools`), live run.
+- [ ] Deferred until the maintainer has a key: E2B backend behind `SANDBOX_BACKEND=e2b` (check langchain-e2b vs deepagents 0.7 pin).
+- [ ] Remaining M0 ADR: observability (Langfuse wiring) — next free ADR number.
 
 Moved out of M-1: Langfuse → M0/M1, MCP + Playwright → M2, Agent Server → ADR from docs.
 

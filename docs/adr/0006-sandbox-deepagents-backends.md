@@ -44,6 +44,10 @@ Docker backend (`staffroom_api/sandbox/docker_backend.py`) is a thin adapter; is
 - Bad: network egress is open in the sandbox (npm needs the registry). Follow-up: egress allowlist proxy.
 - Follow-up: delete per-run volumes after deploy/retention (M6).
 
+## Update 2026-10-07: browser inside the sandbox
+
+Playwright checks run **inside the run's sandbox**: the image adds Microsoft's Playwright MCP server and Chromium (image ~1.4 GB). The worker connects with langchain-mcp-adapters over stdio through `docker exec -i` (Docker CLI in the worker image, via the socket proxy), so no port is exposed. Employees get a curated subset of the browser tools. Details: docs/frameworks/playwright-mcp.md.
+
 ## Sources
 
 - Installed source: deepagents 0.7.22 `backends/protocol.py`, `backends/sandbox.py`; langchain-e2b 0.0.6 METADATA.

@@ -2,6 +2,8 @@
 FROM python:3.13-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /bin/uv
+# Docker CLI: the worker reaches the sandbox's browser via `docker exec -i` (MCP stdio).
+COPY --from=docker:29.8.2-cli /usr/local/bin/docker /usr/local/bin/docker
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_NO_DEV=1
 
 WORKDIR /app
