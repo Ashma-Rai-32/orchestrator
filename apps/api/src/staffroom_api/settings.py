@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # "fake" (deterministic, no key) or "<provider>:<pinned model id>" for init_chat_model.
     staffroom_model: str = "fake"
 
+    # Browsers allowed to call the API (the office UI's origin).
+    cors_origins: list[str] = ["http://localhost:5173"]
+
     # Keycloak (ADR-0003). The issuer is the public URL; JWKS may use an internal one.
     oidc_issuer: str = "http://localhost:8080/realms/staffroom"
     oidc_jwks_url: str = "http://localhost:8080/realms/staffroom/protocol/openid-connect/certs"

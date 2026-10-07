@@ -14,6 +14,7 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
+    "oidc-client-ts": "^3.5.0",
     "phaser": "^4.2.1"
   }
 }

@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 from taskiq import InMemoryBroker
@@ -31,6 +32,13 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
         await app.state.db.dispose()
 
     app = FastAPI(title="Staffroom API", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
+        allow_credentials=False,  # bearer tokens, no cookies
+    )
     for module in (health, catalog, tenants, employees, goals):
         app.include_router(module.router)
     return app

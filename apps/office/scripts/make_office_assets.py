@@ -26,11 +26,15 @@ def png(path: Path, width: int, height: int, pixels: list[list[tuple[int, int, i
     raw = b"".join(b"\x00" + b"".join(bytes(px) for px in row) for row in pixels)
 
     def chunk(kind: bytes, data: bytes) -> bytes:
-        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+        return (
+            struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+        )
 
     header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)  # 8-bit RGBA
     path.write_bytes(
-        b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9))
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(raw, 9))
         + chunk(b"IEND", b"")
     )
 
@@ -43,40 +47,83 @@ CLEAR = (0, 0, 0, 0)
 
 # Each tile is 16 strings of 16 chars; the legend maps chars to colours.
 LEGEND = {
-    ".": CLEAR, "f": hexrgba("#c8a46e"), "F": hexrgba("#b48f5c"), "w": hexrgba("#5b6475"),
-    "W": hexrgba("#454c5a"), "d": hexrgba("#8a5a3b"), "D": hexrgba("#6e4529"),
-    "m": hexrgba("#2b2f3a"), "s": hexrgba("#7fd1ff"), "c": hexrgba("#6c8ebf"),
-    "C": hexrgba("#5a79a6"), "g": hexrgba("#4caf50"), "G": hexrgba("#2e7d32"),
-    "p": hexrgba("#a1663a"), "o": hexrgba("#3d2b1f"), "k": hexrgba("#1b1b1b"),
-    "h": hexrgba("#f2d0a9"), "b": hexrgba("#ffffff"), "B": hexrgba("#d0d0d0"),
+    ".": CLEAR,
+    "f": hexrgba("#c8a46e"),
+    "F": hexrgba("#b48f5c"),
+    "w": hexrgba("#5b6475"),
+    "W": hexrgba("#454c5a"),
+    "d": hexrgba("#8a5a3b"),
+    "D": hexrgba("#6e4529"),
+    "m": hexrgba("#2b2f3a"),
+    "s": hexrgba("#7fd1ff"),
+    "c": hexrgba("#6c8ebf"),
+    "C": hexrgba("#5a79a6"),
+    "g": hexrgba("#4caf50"),
+    "G": hexrgba("#2e7d32"),
+    "p": hexrgba("#a1663a"),
+    "o": hexrgba("#3d2b1f"),
+    "k": hexrgba("#1b1b1b"),
+    "h": hexrgba("#f2d0a9"),
+    "b": hexrgba("#ffffff"),
+    "B": hexrgba("#d0d0d0"),
 }
 
 FLOOR = ["ffffffffFfffffff", "ffffffffFfffffff", "ffffffffFfffffff", "FFFFFFFFFFFFFFFF"] * 4
 WALL = ["wwwwwwwwwwwwwwww"] * 12 + ["WWWWWWWWWWWWWWWW"] * 4
 DESK = (
     ["ffffffffffffffff"] * 2
-    + ["ffffmmmmmmmmffff", "ffffmssssssmffff", "ffffmssssssmffff", "ffffmmmmmmmmffff", "ffffffmmmmffffff"]
-    + ["dddddddddddddddd"] * 5 + ["DDDDDDDDDDDDDDDD"] * 2 + ["DffffffffffffffD", "DffffffffffffffD"]
+    + [
+        "ffffmmmmmmmmffff",
+        "ffffmssssssmffff",
+        "ffffmssssssmffff",
+        "ffffmmmmmmmmffff",
+        "ffffffmmmmffffff",
+    ]
+    + ["dddddddddddddddd"] * 5
+    + ["DDDDDDDDDDDDDDDD"] * 2
+    + ["DffffffffffffffD", "DffffffffffffffD"]
 )
 CARPET = ["cccccccccccccccc", "cCcCcCcCcCcCcCcC"] * 8
-PLANT = (
-    ["ffffffffffffffff", "ffffffgggfffffff", "fffffgGgggffffff", "ffffgggGgggfffff", "fffggGgggGggffff",
-     "ffffgggGgggfffff", "fffffgggGgffffff", "ffffffgggfffffff", "ffffffpppfffffff", "fffffpppppffffff",
-     "fffffpppppffffff", "fffffpppppffffff", "ffffffpppfffffff"] + ["ffffffffffffffff"] * 3
-)
+PLANT = [
+    "ffffffffffffffff",
+    "ffffffgggfffffff",
+    "fffffgGgggffffff",
+    "ffffgggGgggfffff",
+    "fffggGgggGggffff",
+    "ffffgggGgggfffff",
+    "fffffgggGgffffff",
+    "ffffffgggfffffff",
+    "ffffffpppfffffff",
+    "fffffpppppffffff",
+    "fffffpppppffffff",
+    "fffffpppppffffff",
+    "ffffffpppfffffff",
+] + ["ffffffffffffffff"] * 3
 DOOR = ["wwwoooooooooowww"] + ["wwwodddddddddowww"[:16]] * 13 + ["wwwoooooooooowww"] * 2
 TILES = [FLOOR, WALL, DESK, CARPET, PLANT, DOOR]  # gids 1..6
 GID = {name: i + 1 for i, name in enumerate(["floor", "wall", "desk", "carpet", "plant", "door"])}
 
 # Character frames: white body (tinted per employee in Phaser), skin head, dark legs.
 IDLE = [
-    "................", ".....kkkkkk.....", "....khhhhhhk....", "....khkhhkhk....", "....khhhhhhk....",
-    ".....khhhhk.....", "....kbbbbbbk....", "...kbbbbbbbbk...", "...kbBbbbbBbk...", "...kbBbbbbBbk...",
-    "....kbbbbbbk....", "....kbbbbbbk....", ".....kkkkkk.....", ".....kk..kk.....", ".....kk..kk.....",
+    "................",
+    ".....kkkkkk.....",
+    "....khhhhhhk....",
+    "....khkhhkhk....",
+    "....khhhhhhk....",
+    ".....khhhhk.....",
+    "....kbbbbbbk....",
+    "...kbbbbbbbbk...",
+    "...kbBbbbbBbk...",
+    "...kbBbbbbBbk...",
+    "....kbbbbbbk....",
+    "....kbbbbbbk....",
+    ".....kkkkkk.....",
+    ".....kk..kk.....",
+    ".....kk..kk.....",
     "................",
 ]
-WALK_A = IDLE[:13] + [".....kk...kk....", "....kk.....kk...", "................"]
-WALK_B = IDLE[:13] + ["....kk...kk.....", "...kk.....kk....", "................"]
+WALK_A = [*IDLE[:13], ".....kk...kk....", "....kk.....kk...", "................"]
+WALK_B = [*IDLE[:13], "....kk...kk.....", "...kk.....kk....", "................"]
 
 
 def sheet(frames: list[list[str]]) -> tuple[int, int, list[list[tuple[int, int, int, int]]]]:
@@ -124,30 +171,78 @@ def office_map() -> dict[str, object]:
         spot["id"] = i
 
     def tiles(name: str, data: list[int], layer_id: int) -> dict[str, object]:
-        return {"id": layer_id, "name": name, "type": "tilelayer", "width": COLS, "height": ROWS,
-                "x": 0, "y": 0, "opacity": 1, "visible": True, "data": data}
+        return {
+            "id": layer_id,
+            "name": name,
+            "type": "tilelayer",
+            "width": COLS,
+            "height": ROWS,
+            "x": 0,
+            "y": 0,
+            "opacity": 1,
+            "visible": True,
+            "data": data,
+        }
 
     return {
-        "type": "map", "version": "1.10", "tiledversion": "1.11.2", "orientation": "orthogonal",
-        "renderorder": "right-down", "infinite": False, "width": COLS, "height": ROWS,
-        "tilewidth": T, "tileheight": T, "nextlayerid": 4, "nextobjectid": len(spots) + 1,
+        "type": "map",
+        "version": "1.10",
+        "tiledversion": "1.11.2",
+        "orientation": "orthogonal",
+        "renderorder": "right-down",
+        "infinite": False,
+        "width": COLS,
+        "height": ROWS,
+        "tilewidth": T,
+        "tileheight": T,
+        "nextlayerid": 4,
+        "nextobjectid": len(spots) + 1,
         "layers": [
             tiles("floor", floor, 1),
             tiles("furniture", furniture, 2),
-            {"id": 3, "name": "spots", "type": "objectgroup", "draworder": "topdown",
-             "opacity": 1, "visible": True, "x": 0, "y": 0, "objects": spots},
+            {
+                "id": 3,
+                "name": "spots",
+                "type": "objectgroup",
+                "draworder": "topdown",
+                "opacity": 1,
+                "visible": True,
+                "x": 0,
+                "y": 0,
+                "objects": spots,
+            },
         ],
-        "tilesets": [{
-            "firstgid": 1, "name": "office-tiles", "image": "office-tiles.png",
-            "imagewidth": T * len(TILES), "imageheight": T, "tilewidth": T, "tileheight": T,
-            "tilecount": len(TILES), "columns": len(TILES), "margin": 0, "spacing": 0,
-        }],
+        "tilesets": [
+            {
+                "firstgid": 1,
+                "name": "office-tiles",
+                "image": "office-tiles.png",
+                "imagewidth": T * len(TILES),
+                "imageheight": T,
+                "tilewidth": T,
+                "tileheight": T,
+                "tilecount": len(TILES),
+                "columns": len(TILES),
+                "margin": 0,
+                "spacing": 0,
+            }
+        ],
     }
 
 
 def point(name: str, kind: str, x: float, y: float) -> dict[str, object]:
-    return {"id": 0, "name": name, "type": kind, "point": True, "x": x, "y": y,
-            "width": 0, "height": 0, "rotation": 0, "visible": True}
+    return {
+        "id": 0,
+        "name": name,
+        "type": kind,
+        "point": True,
+        "x": x,
+        "y": y,
+        "width": 0,
+        "height": 0,
+        "rotation": 0,
+        "visible": True,
+    }
 
 
 if __name__ == "__main__":

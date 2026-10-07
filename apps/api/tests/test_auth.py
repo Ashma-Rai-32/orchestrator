@@ -64,3 +64,15 @@ def test_token_must_name_exactly_one_organization(
     response = client.get("/employees", headers=bearer(mint(tenants)))
     assert response.status_code == 403
     assert "exactly one organization" in response.json()["detail"]
+
+
+def test_cors_allows_the_office_origin_only(client: TestClient) -> None:
+    preflight = {
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization",
+    }
+    allowed = client.options("/me", headers={"Origin": "http://localhost:5173", **preflight})
+    assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+    other = client.options("/me", headers={"Origin": "http://evil.test", **preflight})
+    assert "access-control-allow-origin" not in other.headers
