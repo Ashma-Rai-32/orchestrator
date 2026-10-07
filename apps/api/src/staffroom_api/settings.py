@@ -1,11 +1,16 @@
+from pathlib import Path
+
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Repo-root .env, so commands work from any directory. Missing in Docker: ignored.
+REPO_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
 
 
 class Settings(BaseSettings):
     """Read from environment variables (same names as compose and .env)."""
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=REPO_ENV_FILE, extra="ignore")
 
     postgres_host: str = "localhost"
     postgres_port: int = 5432

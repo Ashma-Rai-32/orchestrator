@@ -1,5 +1,5 @@
 # Local development stack.
-#   docker compose up -d                              Postgres + Redis
+#   docker compose up -d --build --wait               API (after migrations) + Postgres + Redis
 #   docker compose --profile observability up -d      + Langfuse (http://localhost:3000)
 # Dev-only credentials come from .env (copy .env.example). Never reuse them elsewhere.
 
@@ -8,20 +8,35 @@ name: staffroom
 include:
   - infra/compose/langfuse.yaml
 
+x-api-env: &api-env
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:-staffroom}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staffroom}
+  POSTGRES_DB: ${POSTGRES_DB:-staffroom}
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"  # container port, not the host mapping
+
 services:
+  # One-shot: applies Alembic migrations, then exits. The API starts only if it succeeded.
+  migrate:
+    image: staffroom-api:dev
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["/app/.venv/bin/alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
+    image: staffroom-api:dev
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: "5432"
-      POSTGRES_USER: ${POSTGRES_USER:-staffroom}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staffroom}
-      POSTGRES_DB: ${POSTGRES_DB:-staffroom}
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"  # container port, not the host mapping
+    environment: *api-env
     ports:
       - 127.0.0.1:${API_PORT:-8000}:8000
     healthcheck:  # slim image has no curl
@@ -31,6 +46,8 @@ services:
       retries: 10
       start_period: 5s
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
