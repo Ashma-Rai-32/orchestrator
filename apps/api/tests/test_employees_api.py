@@ -1,10 +1,7 @@
 """Hiring employees through the HTTP API, against real Postgres with RLS."""
 
-import uuid
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import IntegrityError
 
 from tests.helpers import new_tenant
 
@@ -44,15 +41,6 @@ def test_unknown_skill_is_rejected(client: TestClient) -> None:
     assert "cobol" in response.json()["detail"]
 
 
-def test_unknown_tenant_sees_nothing_and_cannot_hire(client: TestClient) -> None:
-    stranger = {"X-Tenant-ID": str(uuid.uuid4())}
-    assert client.get("/employees", headers=stranger).json() == []
-    # The database refuses (no such tenant). Surfaces as a 500 only while the
-    # header stub exists; with auth the tenant comes from a verified token.
-    with pytest.raises(IntegrityError, match="fk_employees_tenant_id_tenants"):
-        client.post("/employees", json={"name": "Spy", "skills": ["react"]}, headers=stranger)
-
-
 def test_run_goal_with_hired_team(client: TestClient) -> None:
     acme = new_tenant(client, "Acme")
     assert client.post("/goals", json={"goal": "Build a site"}, headers=acme).status_code == 409
@@ -83,7 +71,3 @@ def test_runs_are_isolated_between_tenants(client: TestClient) -> None:
 
     assert client.get(f"/runs/{run_id}", headers=globex).status_code == 404
     assert client.get(f"/runs/{run_id}/events", headers=globex).json() == []
-
-
-def test_missing_tenant_header_is_rejected(client: TestClient) -> None:
-    assert client.get("/employees").status_code == 422

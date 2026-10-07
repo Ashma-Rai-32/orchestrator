@@ -2,35 +2,51 @@
 # requires-python = ">=3.12"
 # dependencies = ["httpx==0.28.1", "websockets==17.2"]
 # ///
-"""Dev tool: create a demo tenant + team, start a goal, and print its events live.
+"""Dev tool: sign in as a demo founder, hire a small team, start a goal, print events live.
 
     uv run scripts/watch_run.py "Build me an LLM wrapper website"
+    uv run scripts/watch_run.py --as founder@globex.test "Build a landing page"
 """
 
+import argparse
 import asyncio
 import json
-import sys
 import time
 
 import httpx
 import websockets
 
 API = "http://localhost:8000"
+TOKEN_URL = "http://localhost:8080/realms/staffroom/protocol/openid-connect/token"
+TEAM = [("Pixel 1", ["react", "css"]), ("Pixel 2", ["react", "css"]), ("Ada", ["nodejs", "ai-integration"])]
 
 
-async def main(goal: str) -> None:
+async def sign_in(http: httpx.AsyncClient, username: str) -> str:
+    # DEV ONLY client with password grant (see infra/keycloak/staffroom-realm.json).
+    response = await http.post(TOKEN_URL, data={
+        "grant_type": "password", "client_id": "staffroom-dev-cli",
+        "username": username, "password": "staffroom-dev", "scope": "openid organization",
+    })
+    response.raise_for_status()
+    return str(response.json()["access_token"])
+
+
+async def main(goal: str, username: str) -> None:
     async with httpx.AsyncClient(base_url=API) as http:
-        tenant = (await http.post("/tenants", json={"name": "Watch demo"})).json()["id"]
-        headers = {"X-Tenant-ID": tenant}
-        team = [("Pixel 1", ["react", "css"]), ("Pixel 2", ["react", "css"]), ("Ada", ["nodejs", "ai-integration"])]
-        for name, skills in team:
-            await http.post("/employees", json={"name": name, "skills": skills}, headers=headers)
-        run = (await http.post("/goals", json={"goal": goal}, headers=headers)).json()
+        token = await sign_in(http, username)
+        auth = {"Authorization": f"Bearer {token}"}
+        me = (await http.get("/me", headers=auth)).json()
+        print(f"signed in as {username}, tenant {me['tenant_name']} ({me['tenant_id']})")
+        if not (await http.get("/employees", headers=auth)).json():
+            for name, skills in TEAM:
+                await http.post("/employees", json={"name": name, "skills": skills}, headers=auth)
+        run = (await http.post("/goals", json={"goal": goal}, headers=auth)).json()
 
     print(f"run {run['id']} ({run['status']}), streaming:\n")
     start = time.monotonic()
-    url = f"ws://localhost:8000/runs/{run['id']}/stream?tenant_id={tenant}"
-    async with websockets.connect(url) as ws:
+    url = f"ws://localhost:8000/runs/{run['id']}/stream"
+    # Token travels as a WebSocket subprotocol, not in the URL (URLs end up in logs).
+    async with websockets.connect(url, subprotocols=["bearer", token]) as ws:
         async for message in ws:
             event = json.loads(message)["event"]
             details = ", ".join(f"{k}={v!r}" for k, v in event.items() if k != "type")
@@ -38,4 +54,8 @@ async def main(goal: str) -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "Build me an LLM wrapper website"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("goal", nargs="?", default="Build me an LLM wrapper website")
+    parser.add_argument("--as", dest="username", default="founder@acme.test")
+    args = parser.parse_args()
+    asyncio.run(main(args.goal, args.username))

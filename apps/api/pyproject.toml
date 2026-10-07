@@ -18,6 +18,7 @@ dependencies = [
     "psycopg[binary]>=3.3.6",  # driver used by the LangGraph Postgres checkpointer
     "taskiq>=0.13.0",
     "taskiq-redis>=1.2.4",
+    "pyjwt[crypto]>=2.15.1",
 ]
 
 [dependency-groups]

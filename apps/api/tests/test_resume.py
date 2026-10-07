@@ -45,7 +45,7 @@ async def collect(stream: Any) -> list[TeamEvent]:
 async def test_resumes_without_redoing_finished_tasks(
     api_settings: Settings, client: TestClient
 ) -> None:
-    acme = uuid.UUID(new_tenant(client, "Acme")["X-Tenant-ID"])
+    acme = new_tenant(client, "Acme").id
     thread = thread_id(acme, uuid.uuid4())
     CrashOnceBeforeSummary.crashed = False
 
@@ -74,7 +74,7 @@ async def test_checkpoints_are_isolated_between_tenants(
     api_settings: Settings, client: TestClient
 ) -> None:
     acme_headers, globex_headers = new_tenant(client, "Acme"), new_tenant(client, "Globex")
-    acme, globex = (uuid.UUID(h["X-Tenant-ID"]) for h in (acme_headers, globex_headers))
+    acme, globex = acme_headers.id, globex_headers.id
     run_id = uuid.UUID(start_run(client, acme_headers))
     config = {"configurable": {"thread_id": thread_id(acme, run_id)}}
 

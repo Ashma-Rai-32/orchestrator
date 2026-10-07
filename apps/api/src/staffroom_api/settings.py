@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # "fake" (deterministic, no key) or "<provider>:<pinned model id>" for init_chat_model.
     staffroom_model: str = "fake"
 
+    # Keycloak (ADR-0003). The issuer is the public URL; JWKS may use an internal one.
+    oidc_issuer: str = "http://localhost:8080/realms/staffroom"
+    oidc_jwks_url: str = "http://localhost:8080/realms/staffroom/protocol/openid-connect/certs"
+    oidc_audience: str = "staffroom-api"
+
     # Task queue (ADR-0004). "memory" runs tasks inline (tests).
     task_broker: Literal["redis", "memory"] = "redis"
     # A run segment must finish before its message can be re-claimed by another worker.

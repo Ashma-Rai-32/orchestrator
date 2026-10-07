@@ -17,6 +17,7 @@ from testcontainers.community.postgres import PostgresContainer
 from staffroom_api.agents import checkpoints
 from staffroom_api.main import create_app
 from staffroom_api.settings import Settings
+from tests.helpers import test_verifier
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
 APP_ROLE, APP_PASSWORD = "staffroom_app", "app-test"
@@ -99,5 +100,5 @@ def api_settings(postgres: PostgresContainer, rls_db: dict[str, str]) -> Setting
 
 @pytest.fixture
 def client(api_settings: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(api_settings)) as c:
+    with TestClient(create_app(api_settings, verifier=test_verifier())) as c:
         yield c

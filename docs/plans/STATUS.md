@@ -20,7 +20,8 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [x] taskiq-redis reclaim bug fixed with `broker.py` subclass (option a); verified live. Upstream issue drafted for the maintainer to file.
 - [ ] M5: domain watchdog for runs stuck in `running` (option c) — also covers segment timeouts.
 - [ ] Known gap: a segment that times out (taskiq `timeout`) is cancelled with `CancelledError` (not caught) → run stays `running`. Handle with the watchdog/fix above.
-- [ ] Next: auth (ADR-0003), then M2 sandbox + tools.
+- [x] Auth (ADR-0003): Keycloak organizations = tenants, realm as code; API verifies tokens with PyJWT; WebSocket token via subprotocol. Header stub removed.
+- [ ] Next: M2 sandbox + tools (sandbox ADR first). Remaining M0 ADR: observability (Langfuse wiring, ADR-0006).
 
 Moved out of M-1: Langfuse → M0/M1, MCP + Playwright → M2, Agent Server → ADR from docs.
 

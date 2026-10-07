@@ -63,14 +63,14 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Framework spikes (M-1) | Real | [docs/frameworks/](docs/frameworks/) |
 | FastAPI app + `/health` in compose (M0) | Real | Checks Postgres and Redis; tested in CI |
 | Alembic migrations, tenants + employees with RLS (M0) | Real | Isolation proven by tests against real Postgres ([ADR-0005](docs/adr/0005-tenant-isolation-with-postgres-rls.md)) |
-| Skill catalog, tenants, hire/list employees API (M1) | Real | Tested over HTTP against Postgres with RLS |
+| Skill catalog, hire/list employees API (M1) | Real | Tested over HTTP against Postgres with RLS; tenants created on first sign-in |
 | Team builder + `POST /goals` (M1) | Real, **fake model** | Coordinator + skill pools (ADR-0007); no real LLM yet |
 | Runs + event log (M1) | Real | `POST /goals` returns 202; events stored per tenant with RLS |
 | Background worker (M1) | Real | Taskiq on Redis Streams ([ADR-0004](docs/adr/0004-task-queue-taskiq.md)) |
 | Resume after worker crash (M1) | Real | Resumes from the LangGraph Postgres checkpoint without redoing finished tasks (tested + demoed with `kill -9`). Includes a workaround for a taskiq-redis reclaim bug ([ADR-0004](docs/adr/0004-task-queue-taskiq.md)) |
 | Live event stream (M1) | Real | WebSocket `/runs/{id}/stream`: replay + live via Redis Streams, Postgres fallback |
 | Identity provider: Keycloak with organizations (M0) | Real | Realm as code ([ADR-0003](docs/adr/0003-auth-keycloak.md)); demo founders for Acme and Globex |
-| API token verification | **Stubbed** | API still trusts an `X-Tenant-ID` header; next step wires Keycloak tokens in. Do not expose publicly |
+| API token verification | Real | PyJWT against Keycloak's JWKS; tenant = the token's organization; WebSocket token via subprotocol (never in URLs or logs) |
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox and tools (M2) | Planned | |
 | Office UI (M3) | Planned | |
@@ -95,17 +95,19 @@ docker compose --profile observability up -d      # optional: Langfuse at http:/
 uv run pytest apps/api                            # tests (need Postgres + Redis running)
 ```
 
-Try it (the `X-Tenant-ID` header is a **dev-only stub** until auth lands):
+Try it as a demo founder (tokens come from Keycloak; the `staffroom-dev-cli` password login is **dev only**):
 
 ```bash
-T=$(curl -s -X POST localhost:8000/tenants -H 'content-type: application/json' -d '{"name":"Demo Co"}' | jq -r .id)
-curl -s localhost:8000/skills | jq '.[].key'
-curl -s -X POST localhost:8000/employees -H "X-Tenant-ID: $T" -H 'content-type: application/json' \
+TOKEN=$(curl -s localhost:8080/realms/staffroom/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=staffroom-dev-cli -d scope="openid organization" \
+  -d username=founder@acme.test -d password=staffroom-dev | jq -r .access_token)
+curl -s localhost:8000/me -H "Authorization: Bearer $TOKEN"
+curl -s -X POST localhost:8000/employees -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
   -d '{"name":"Robin","skills":["react","css"]}'
-curl -s localhost:8000/employees -H "X-Tenant-ID: $T"
 
-# watch a whole run live (creates a demo team, starts a goal, prints WebSocket events)
+# sign in, hire a small team, start a goal, and print its events live over the WebSocket
 uv run scripts/watch_run.py "Build me an LLM wrapper website"
+uv run scripts/watch_run.py --as founder@globex.test "Build a landing page"
 ```
 
 Keycloak (identity): http://localhost:8080 (admin console: `admin` / `admin`). Demo founders: `founder@acme.test` and `founder@globex.test`, password `staffroom-dev`.

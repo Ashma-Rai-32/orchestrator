@@ -49,6 +49,9 @@ services:
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:-staffroom_app}
       # "fake:1" = deterministic fake model, 1 s per reply, so runs are watchable.
       STAFFROOM_MODEL: ${STAFFROOM_MODEL:-fake:1}
+      # Tokens say iss=localhost:8080 (KC_HOSTNAME); keys are fetched over the compose network.
+      OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/staffroom
+      OIDC_JWKS_URL: http://keycloak:8080/realms/staffroom/protocol/openid-connect/certs
     ports:
       - 127.0.0.1:${API_PORT:-8000}:8000
     healthcheck:  # slim image has no curl

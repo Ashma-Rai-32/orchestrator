@@ -10,7 +10,7 @@ from staffroom_api import event_stream
 from staffroom_api.agents.events import TeamEvent, team_event
 from staffroom_api.db.models import Employee, Event, Run
 from staffroom_api.db.tenancy import tenant_transaction
-from staffroom_api.deps import TenantId, TenantSession
+from staffroom_api.deps import WS_SUBPROTOCOL, TenantId, TenantSession, websocket_principal
 from staffroom_api.worker import run_segment
 
 router = APIRouter(tags=["runs"])
@@ -84,12 +84,17 @@ TERMINAL_STATUSES = {"succeeded", "failed"}
 
 
 @router.websocket("/runs/{run_id}/stream")
-async def stream_run(websocket: WebSocket, run_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
+async def stream_run(websocket: WebSocket, run_id: uuid.UUID) -> None:
     """Live events for one run: full replay first, then live, then the socket closes.
 
-    STUB auth: the tenant comes from `?tenant_id=` (browsers cannot set headers on
-    WebSockets). Replaced by a token check when auth lands.
+    Auth: the client offers subprotocols ["bearer", <access token>] (browsers cannot
+    set an Authorization header on WebSockets, and URLs end up in access logs).
     """
+    principal = await websocket_principal(websocket)
+    if principal is None:
+        await websocket.close(code=4401, reason="Not signed in.")
+        return
+    tenant_id = principal.tenant_id
     state = websocket.app.state
     async with tenant_transaction(state.db, tenant_id) as conn:
         run = await AsyncSession(bind=conn).get(Run, run_id)
@@ -97,7 +102,7 @@ async def stream_run(websocket: WebSocket, run_id: uuid.UUID, tenant_id: uuid.UU
         await websocket.close(code=4404, reason="Run not found.")  # RLS hides other tenants
         return
 
-    await websocket.accept()
+    await websocket.accept(subprotocol=WS_SUBPROTOCOL)
     live_feed_gone = run.status in TERMINAL_STATUSES and not await event_stream.exists(
         state.redis, tenant_id, run_id
     )
