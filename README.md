@@ -63,7 +63,8 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Framework spikes (M-1) | Real | [docs/frameworks/](docs/frameworks/) |
 | FastAPI app + `/health` in compose (M0) | Real | Checks Postgres and Redis; tested in CI |
 | Alembic migrations, tenants + employees with RLS (M0) | Real | Isolation proven by tests against real Postgres ([ADR-0005](docs/adr/0005-tenant-isolation-with-postgres-rls.md)) |
-| Auth (M0) | Planned | |
+| Skill catalog, tenants, hire/list employees API (M1) | Real | Tested over HTTP against Postgres with RLS |
+| Auth (M0) | **Stubbed** | Tenant comes from an `X-Tenant-ID` header; do not expose publicly |
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox and tools (M2) | Planned | |
 | Office UI (M3) | Planned | |
@@ -86,6 +87,16 @@ docker compose up -d --build --wait               # API + Postgres + Redis
 curl http://localhost:8000/health                 # {"status":"ok",...}; API docs at /docs
 docker compose --profile observability up -d      # optional: Langfuse at http://localhost:3000
 uv run pytest apps/api                            # tests (need Postgres + Redis running)
+```
+
+Try it (the `X-Tenant-ID` header is a **dev-only stub** until auth lands):
+
+```bash
+T=$(curl -s -X POST localhost:8000/tenants -H 'content-type: application/json' -d '{"name":"Demo Co"}' | jq -r .id)
+curl -s localhost:8000/skills | jq '.[].key'
+curl -s -X POST localhost:8000/employees -H "X-Tenant-ID: $T" -H 'content-type: application/json' \
+  -d '{"name":"Robin","skills":["react","css"]}'
+curl -s localhost:8000/employees -H "X-Tenant-ID: $T"
 ```
 
 Langfuse login with the dev defaults from `.env.example`: `admin@staffroom.local` / `staffroom-dev`.

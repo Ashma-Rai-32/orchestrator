@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from staffroom_api.routes import health
+from staffroom_api.routes import catalog, employees, health, tenants
 from staffroom_api.settings import Settings
 
 
@@ -22,7 +22,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await app.state.db.dispose()
 
     app = FastAPI(title="Staffroom API", lifespan=lifespan)
-    app.include_router(health.router)
+    for module in (health, catalog, tenants, employees):
+        app.include_router(module.router)
     return app
 
 

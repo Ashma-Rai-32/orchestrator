@@ -1,0 +1,38 @@
+# Platform skill catalog (shared by all tenants). An employee's prompt and tools
+# are the merge of their skills. `tools` names are resolved by the tool registry (M2).
+
+[react]
+name = "React"
+description = "Builds interactive web interfaces with React and TypeScript."
+prompt = "You build React user interfaces in TypeScript: small components, accessible markup, no unnecessary dependencies."
+tools = []
+
+[css]
+name = "CSS & design"
+description = "Makes pages look good on every screen size."
+prompt = "You write clean, responsive CSS and keep layouts consistent across screen sizes."
+tools = []
+
+[nodejs]
+name = "Node.js"
+description = "Builds backends and APIs with Node.js."
+prompt = "You build small, well-tested Node.js backends and HTTP APIs."
+tools = []
+
+[python]
+name = "Python"
+description = "Builds backends, scripts and data tasks in Python."
+prompt = "You write typed, tested Python with clear module boundaries."
+tools = []
+
+[ai-integration]
+name = "AI integration"
+description = "Connects products to LLM APIs safely."
+prompt = "You integrate LLM APIs into products. API keys are referenced by secret name only and never written into code or logs."
+tools = []
+
+[testing]
+name = "Testing"
+description = "Writes automated tests and checks sites in a real browser."
+prompt = "You write focused automated tests and verify pages in a real browser before calling work done."
+tools = []

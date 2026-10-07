@@ -4,8 +4,11 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
+
+from staffroom_api.settings import Settings
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
 APP_ROLE, APP_PASSWORD = "staffroom_app", "app-test"
@@ -71,3 +74,15 @@ def rls_db(postgres: PostgresContainer) -> dict[str, str]:
         "owner": owner_url,
         "app": _url(postgres, driver="asyncpg", user=APP_ROLE, password=APP_PASSWORD, db="rls"),
     }
+
+
+@pytest.fixture(scope="session")
+def api_settings(postgres: PostgresContainer, rls_db: dict[str, str]) -> Settings:
+    """App settings pointing at the migrated test database, as the app role."""
+    return Settings(
+        postgres_host=postgres.get_container_host_ip(),
+        postgres_port=int(postgres.get_exposed_port(5432)),
+        postgres_db="rls",
+        app_db_user=APP_ROLE,
+        app_db_password=SecretStr(APP_PASSWORD),
+    )
