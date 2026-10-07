@@ -12,6 +12,7 @@ Questions:
      deterministic fake model for tests, without changing calling code?
   2. How does tool calling work, and can the fake model take part in it?
   3. Can we get validated Pydantic objects back (e.g. a coordinator's plan)?
+  4. What does the model layer give us for rate limits, retries and fallbacks?
 
 Run:  uv run spikes/langchain-models/main.py
 Real: STAFFROOM_REAL_MODEL=1 ANTHROPIC_API_KEY=... uv run spikes/langchain-models/main.py
@@ -19,6 +20,7 @@ Real: STAFFROOM_REAL_MODEL=1 ANTHROPIC_API_KEY=... uv run spikes/langchain-model
 
 import json
 import os
+import time
 from collections.abc import Sequence
 from typing import Any
 
@@ -26,6 +28,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain_core.tools import tool
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, Field
@@ -178,8 +181,59 @@ def demo_structured_output() -> None:
           f"{str(result['parsing_error']).splitlines()[0]}")
 
 
+class FlakyReplies:
+    """Reply iterator for the fake model that fails the first `failures` calls."""
+
+    def __init__(self, failures: int, reply: str) -> None:
+        self.failures, self.reply, self.calls = failures, reply, 0
+
+    def __iter__(self) -> "FlakyReplies":
+        return self
+
+    def __next__(self) -> str:
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise ConnectionError(f"provider timeout (simulated, call {self.calls})")
+        return self.reply
+
+
+def demo_resilience() -> None:
+    print("\n== 5. Resilience at the model level ==")
+
+    # a) Rate limiting is a constructor argument on every chat model (token bucket).
+    #    It blocks before each call, so it is shared by everything using this instance.
+    limiter = InMemoryRateLimiter(requests_per_second=2, check_every_n_seconds=0.05)
+    model = FakeToolCallingModel(messages=iter(["ok"] * 4), rate_limiter=limiter)
+    start = time.monotonic()
+    for i in range(4):
+        model.invoke("ping")
+        print(f"  rate-limited call {i + 1} at t={time.monotonic() - start:.2f}s")
+
+    # b) with_retry: re-run on chosen exceptions, with exponential backoff.
+    #    (Real provider clients also retry internally via max_retries=.)
+    replies = FlakyReplies(failures=2, reply="answered on attempt 3")
+    retrying = FakeToolCallingModel(messages=replies).with_retry(
+        retry_if_exception_type=(ConnectionError,),
+        stop_after_attempt=3,
+        wait_exponential_jitter=False,
+    )
+    print(f"\n  with_retry -> {retrying.invoke('hello').content!r} (calls made: {replies.calls})")
+
+    # c) with_fallbacks: try the primary, then each fallback in order.
+    #    In production the fallback would be another provider via init_chat_model.
+    primary = FakeToolCallingModel(messages=FlakyReplies(failures=99, reply=""))
+    backup = FakeToolCallingModel(messages=iter(["answered by backup model"]))
+    resilient = primary.with_fallbacks([backup], exceptions_to_handle=(ConnectionError,))
+    print(f"  with_fallbacks -> {resilient.invoke('hello').content!r}")
+
+    # Gotcha: both wrappers return a Runnable, not a chat model.
+    print(f"\n  type after with_fallbacks: {type(resilient).__name__}")
+    print(f"  still a BaseChatModel? {isinstance(resilient, BaseChatModel)}")
+
+
 if __name__ == "__main__":
     demo_same_calling_code()
     demo_configurable_model()
     demo_tool_calling()
     demo_structured_output()
+    demo_resilience()

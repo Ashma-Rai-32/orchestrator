@@ -4,15 +4,19 @@ _Last updated: 2026-10-07_
 
 ## Current milestone
 
-**M-1, spike `langchain-models`, working in small increments** (one concept per step, run and shown, then maintainer reviews and commits).
+**M-1 Framework discovery**, in small increments (one concept per step, run and shown, maintainer reviews and commits).
 
 ## Next step
 
-- [x] Increment 1: model from config (`init_chat_model`) + scripted fake model (`GenericFakeChatModel`); same calling code.
-- [x] Increment 2: tool calling. `@tool` → schema; scripted `tool_calls`; `tool.invoke(tool_call)` returns a linked `ToolMessage`. No fake in langchain-core or langchain-tests implements `bind_tools` → 5-line `FakeToolCallingModel` subclass (only custom code). Open gotcha: a tool returning `list[str]` becomes list `ToolMessage.content`; check how real providers treat it.
-- [x] Increment 3: structured output. Default `with_structured_output` = schema bound as a forced tool + `PydanticToolsParser` (so the fake works by scripting a tool call named after the class). `include_raw=True` returns `{raw, parsed, parsing_error}` instead of raising. Anthropic also offers `method="json_schema"` (native structured outputs); compare with a real model later.
-- [ ] Increment 4: resilience (`with_fallbacks`, `InMemoryRateLimiter`, retries).
-- [ ] Increment 5: `test_spike.py` + `docs/frameworks/langchain-models.md`.
+M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only spikes that change architecture remain; other frameworks are learned in the milestone that first uses them.
+
+- [x] Spike `langchain-models` → [docs/frameworks/langchain-models.md](../frameworks/langchain-models.md) (verdict: adopt behind one adapter).
+- [x] Spike `langgraph-core`: StateGraph, reducers, runtime context, v2 streaming, conditional edges, `Send` fan-out/fan-in.
+- [x] Spike `team-builder` → ADR-0007 (tool-calling coordinator, one tool per skill pool).
+- [x] Spike `checkpoint-interrupt`: pause in one process, resume in another via `PostgresSaver`; `response_schema` validates admin answers. Findings: [docs/frameworks/langgraph.md](../frameworks/langgraph.md).
+- [ ] **M0 next**: FastAPI app + health route running in compose, then Alembic + tenants + RLS with isolation tests.
+
+Moved out of M-1: Langfuse → M0/M1, MCP + Playwright → M2, Agent Server → ADR from docs.
 
 ## Answered questions
 

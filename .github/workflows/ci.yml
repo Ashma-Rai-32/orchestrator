@@ -50,5 +50,21 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose --profile observability config --quiet
 
+  spikes:
+    name: Spike tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      # Each spike test is a PEP 723 script with its own pinned deps. Fake models only.
+      - run: |
+          for t in spikes/*/test_spike.py; do
+            echo "::group::$t"
+            uv run "$t"
+            echo "::endgroup::"
+          done
+
   # test job (pytest with Postgres/Redis service containers) is added in M0
   # together with the first Python code.
