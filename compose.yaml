@@ -97,6 +97,7 @@ services:
       # Gemini (free tier): key only reaches the worker, never the API container.
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       MODEL_REQUESTS_PER_SECOND: ${MODEL_REQUESTS_PER_SECOND:-}
+      STAFFROOM_FALLBACK_MODELS: ${STAFFROOM_FALLBACK_MODELS:-[]}
     extra_hosts:
       - host.docker.internal:host-gateway  # also works on Linux Docker
     depends_on:

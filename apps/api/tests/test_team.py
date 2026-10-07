@@ -118,3 +118,15 @@ async def test_a_failed_task_is_reported_and_the_run_continues() -> None:
     assert len(failed) == 1
     assert failed[0].error == "ConnectionError"  # type only, never the message
     assert events[-1].type == "run_finished"
+
+
+async def test_falls_back_to_the_next_model_when_the_main_one_errors() -> None:
+    """E.g. a free tier's daily quota (HTTP 429): the same call retries on another model."""
+    team = build_team(
+        [EmployeeSpec("Robin", ["react"])],
+        model=lambda: _BrokenEmployee(),  # every agent's main model fails
+        fallbacks=lambda: [RuleBasedFakeModel()],
+    )
+    events = [e.type async for e in team.stream("goal")]
+    assert "task_failed" not in events
+    assert events[-1] == "run_finished"

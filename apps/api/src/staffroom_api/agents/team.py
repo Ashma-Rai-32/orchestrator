@@ -19,7 +19,7 @@ from typing import Any, Protocol
 from deepagents.backends.protocol import SandboxBackendProtocol
 from deepagents.middleware.filesystem import FilesystemMiddleware
 from langchain.agents import create_agent
-from langchain.agents.middleware import ModelCallLimitMiddleware
+from langchain.agents.middleware import ModelCallLimitMiddleware, ModelFallbackMiddleware
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
@@ -89,6 +89,14 @@ class Team(Protocol):
 
 
 ModelFactory = Callable[[], BaseChatModel]
+FallbacksFactory = Callable[[], list[BaseChatModel]]
+
+
+def _fallback_middleware(fallbacks: FallbacksFactory) -> list[Any]:
+    """On a model error (e.g. a free tier's daily quota, HTTP 429), retry the same call
+    on the next model. Free-tier quotas are per model, so a chain multiplies them."""
+    models = fallbacks()
+    return [ModelFallbackMiddleware(*models)] if models else []
 
 
 class _LangGraphTeam:
@@ -99,8 +107,12 @@ class _LangGraphTeam:
         checkpointer: BaseCheckpointSaver[Any] | None,
         sandbox: SandboxBackendProtocol | None,
         toolsets: Mapping[str, list[BaseTool]],
+        fallbacks: FallbacksFactory,
     ) -> None:
-        agents = {e.name: self._employee_agent(e, model(), sandbox, toolsets) for e in employees}
+        agents = {
+            e.name: self._employee_agent(e, model(), sandbox, toolsets, fallbacks)
+            for e in employees
+        }
 
         pools: dict[tuple[str, ...], list[str]] = defaultdict(list)
         for e in employees:
@@ -115,6 +127,7 @@ class _LangGraphTeam:
             system_prompt=COORDINATOR_PROMPT,
             name="coordinator",
             checkpointer=checkpointer,
+            middleware=_fallback_middleware(fallbacks),
         )
 
     @staticmethod
@@ -123,11 +136,15 @@ class _LangGraphTeam:
         model: BaseChatModel,
         sandbox: SandboxBackendProtocol | None,
         toolsets: Mapping[str, list[BaseTool]],
+        fallbacks: FallbacksFactory,
     ) -> Any:
         profile = merge_skills(e.skills)
         # Skill-specific tools, e.g. the browser for `testing` (catalog.toml `tools`).
         skill_tools = [tool for name in profile.tools for tool in toolsets.get(name, [])]
-        middleware: list[Any] = [ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS_PER_RUN)]
+        middleware: list[Any] = [
+            ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS_PER_RUN),
+            *_fallback_middleware(fallbacks),
+        ]
         if sandbox is not None:
             # deepagents: ls/read_file/write_file/edit_file/glob/grep/execute on the run's
             # sandbox. All employees of a run share one workspace (they build one site).
@@ -256,10 +273,11 @@ def build_team(
     checkpointer: BaseCheckpointSaver[Any] | None = None,
     sandbox: SandboxBackendProtocol | None = None,
     toolsets: Mapping[str, list[BaseTool]] | None = None,
+    fallbacks: FallbacksFactory = list,
 ) -> _LangGraphTeam:
     if not employees:
         raise ValueError("a team needs at least one employee")
-    return _LangGraphTeam(employees, model, checkpointer, sandbox, toolsets or {})
+    return _LangGraphTeam(employees, model, checkpointer, sandbox, toolsets or {}, fallbacks)
 
 
 def employee_prompt(skills_prompt: str, has_sandbox: bool) -> str:

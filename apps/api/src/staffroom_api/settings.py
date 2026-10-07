@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     staffroom_model: str = "fake"
     # Throttle real model calls per worker process (free tiers allow few requests/minute).
     model_requests_per_second: float | None = None
+    # Tried in order when the main model errors (e.g. a free tier's daily quota).
+    # JSON list in env: STAFFROOM_FALLBACK_MODELS='["google_genai:gemini-3.1-flash-lite"]'
+    staffroom_fallback_models: list[str] = []
 
     # Browsers allowed to call the API (the office UI's origin).
     cors_origins: list[str] = ["http://localhost:5173"]
