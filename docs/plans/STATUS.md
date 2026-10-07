@@ -4,34 +4,41 @@ _Last updated: 2026-10-07_
 
 ## Current milestone
 
-**Pre-M-1: planning.** Plan proposed, awaiting answers to open questions before scaffolding.
+**Scaffold done (uncommitted), M-1 next.**
 
 ## Next step
 
-1. Get answers to the open questions below (or "go with recommendations").
-2. Scaffold, one commit each: repo layout → CLAUDE.md → README skeleton → ADR-0001, ADR-0002 → docker compose → CI.
-3. Start M-1 spikes (see [roadmap.md](roadmap.md#m-1-framework-discovery)).
+1. Maintainer commits the scaffold (split proposed in the session; see "Scaffold" in [roadmap.md](roadmap.md)).
+2. Start M-1, first spike: `langchain-models` (see [roadmap.md](roadmap.md#m-1-framework-discovery)).
 
-## Open questions
+## Answered questions
 
-| # | Question | Recommendation |
+The maintainer said "proceed" without picking options, so the recommendations were adopted. Any of these can still be overridden.
+
+| # | Question | Adopted |
 |---|---|---|
-| Q1 | Self-host LangGraph Agent Server (`langgraph-api`: threads, background runs, cron, streaming, store) or own FastAPI + task queue on the MIT `langgraph` library? | Own FastAPI (full control of RLS/auth, more CV value); still run a `langgraph-server` spike and decide in ADR-0008. Check self-hosted licensing. |
-| Q2 | Auth provider? Zitadel (self-hosted, orgs = tenants) / Keycloak (heavier) / Clerk or WorkOS (hosted, breaks 5-min local run) / fastapi-users (no orgs) | Zitadel in compose + authlib JWT verification |
-| Q3 | Real-LLM key + small budget for M-1 spikes? | Fake model in CI; one real-model run per spike behind an env flag |
-| Q4 | 10 same-skill employees: interchangeable pool or distinct personas? | Product call; spike tests both (role routing + `Send` pool vs. N handoff targets) |
-| Q5 | Create public GitHub repo / push? License MIT or Apache-2.0? | Remote `origin` already exists; confirm push permission and license |
+| Q1 | LangGraph Agent Server vs own FastAPI | Own FastAPI on MIT `langgraph`; `langgraph-server` spike in M-1 → ADR-0008 |
+| Q2 | Auth provider | Zitadel (self-hosted). **Revisit in ADR-0003:** Zitadel v4 compose is 4 containers (Traefik, API, Next.js login, Postgres); added to compose only at the M0 auth task |
+| Q3 | Real LLM in spikes | Fake model in CI; real-model run opt-in via `STAFFROOM_REAL_MODEL=1` (needs a key from maintainer) |
+| Q4 | 10 same-skill employees: pool or personas | Spike tests both; default decided in ADR-0007 |
+| Q5 | Push / license | No pushing by agents; license MIT |
 
-## Versions checked (PyPI/npm, 2026-10-07)
+## Versions checked (PyPI/npm/GitHub, 2026-10-07)
 
-langgraph 1.2.14 · langchain 1.4.3 · langchain-core 1.6.7 · langgraph-supervisor 0.0.31 · langgraph-swarm 0.1.0 · langgraph-checkpoint-postgres 3.1.2 · langchain-mcp-adapters 0.3.2 · langfuse 4.17.0 · playwright 1.63.0 · phaser 4.2.1 · celery 5.6.3 · dramatiq 2.2.1 · arq 0.28.0 · taskiq 0.13.0 · fastapi-users 15.0.5
+Python libs: langgraph 1.2.14 · langchain 1.4.3 · langchain-core 1.6.7 · langgraph-supervisor 0.0.31 · langgraph-swarm 0.1.0 · langgraph-checkpoint-postgres 3.1.2 · langchain-mcp-adapters 0.3.2 · langfuse 4.17.0 · playwright 1.63.0 · celery 5.6.3 · dramatiq 2.2.1 · arq 0.28.0 · taskiq 0.13.0 · fastapi-users 15.0.5
+
+Tooling: uv 0.12.23 · ruff 0.16.10 · mypy 2.4.0 · pytest 9.1.1 · pre-commit 4.6.2 · gitleaks 8.30.1 · phaser 4.2.1
+
+Services: Langfuse server v4 (`langfuse/langfuse:4`) · Zitadel v4.19.4 · Postgres 17 · Redis 7.4
+
+CI actions: actions/checkout v7 · astral-sh/setup-uv v10 · actions/cache v6 · gitleaks/gitleaks-action v3
 
 ## Flags to verify in docs (from planning, not yet confirmed)
 
 - `langgraph-supervisor` / `langgraph-swarm` are pre-1.0; LangChain docs may now recommend a hand-built tool-calling supervisor via `langchain.agents.create_agent`.
 - `langgraph.prebuilt.create_react_agent` superseded by `langchain.agents.create_agent` + middleware in v1.
 - Playwright has an official MCP server → reach via `langchain-mcp-adapters` instead of writing tool wrappers.
-- Langfuse v4 SDK is OTel-native; self-host v3 server needs ClickHouse + MinIO + Redis + Postgres → put behind compose profile `observability`.
+- Langfuse v4 SDK is OTel-native.
 - arq possibly maintenance-only.
 - Fake chat models may lack `bind_tools` → may need a tiny subclass.
 
@@ -41,14 +48,28 @@ langgraph 1.2.14 · langchain 1.4.3 · langchain-core 1.6.7 · langgraph-supervi
 - Postgres RLS is bypassed by the table owner → app connects as a non-owner role (or `FORCE ROW LEVEL SECURITY`); tests use the app role.
 - Secrets: agents reference secrets by name; tools resolve at call time; Langfuse masking as second layer.
 - Runaway autonomous runs → recursion limit + per-run budget via middleware.
+- Local stack is heavy (Langfuse = 6 containers, Zitadel = 4) → both behind profiles.
 
 ## Decision log
 
 | Date | Decision | Where |
 |---|---|---|
 | 2026-10-07 | Plans live in `docs/plans/` (STATUS + roadmap) | this file |
+| 2026-10-07 | Agents never commit; maintainer commits | `docs/plans/README.md`, `CLAUDE.md` |
+| 2026-10-07 | ADRs use trimmed MADR | ADR-0001 |
+| 2026-10-07 | Monorepo, virtual uv workspace, spikes as PEP 723 scripts | ADR-0002 |
+| 2026-10-07 | Langfuse vendored from upstream compose into `infra/compose/langfuse.yaml`, profile `observability`, generic env vars namespaced `LANGFUSE_*` | compose header comment |
+| 2026-10-07 | CI: pre-commit (ruff, hygiene), gitleaks full-history job, compose config check; pytest job added with M0 code | `.github/workflows/ci.yml` |
+
+## Gotchas found
+
+- Langfuse upstream compose reads generic `REDIS_PORT`, `AWS_*`, `DATABASE_URL` → collided with Staffroom's `.env`. Fixed by namespacing.
+- `langfuse-web` has no healthcheck, so `docker compose up --wait` returns before it is ready (~1 min to migrate on first start).
+- Maintainer's machine runs a Homebrew Redis on 6379 → local `.env` uses `REDIS_PORT=6380`.
+- uv not installed on maintainer's machine (`brew install uv`); `uv.lock` was generated with a temporary uv 0.12.23.
 
 ## Done
 
 - [x] Initial plan proposed (M-1, M0, M1)
 - [x] `docs/plans/` created
+- [x] Scaffold: layout, CLAUDE.md, README, ADR-0001/0002, compose (verified: Postgres, Redis, Langfuse healthy, init API keys work), CI + pre-commit (passes locally)

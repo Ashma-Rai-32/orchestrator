@@ -1,0 +1,47 @@
+# Local development stack.
+#   docker compose up -d                              Postgres + Redis
+#   docker compose --profile observability up -d      + Langfuse (http://localhost:3000)
+# Dev-only credentials come from .env (copy .env.example). Never reuse them elsewhere.
+
+name: staffroom
+
+include:
+  - infra/compose/langfuse.yaml
+
+services:
+  postgres:
+    image: docker.io/postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-staffroom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staffroom}
+      POSTGRES_DB: ${POSTGRES_DB:-staffroom}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-staffroom} -d ${POSTGRES_DB:-staffroom}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: docker.io/redis:7.4-alpine
+    restart: unless-stopped
+    command: ["--appendonly", "yes"]
+    ports:
+      - 127.0.0.1:${REDIS_PORT:-6379}:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

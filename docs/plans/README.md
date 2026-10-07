@@ -17,7 +17,7 @@ Working memory for this repo. Anyone (human or agent) picking up work starts her
 
 - Adopt well-maintained frameworks for anything commodity; write code only for what is unique to Staffroom. If about to hand-write something a framework provides, stop and flag it.
 - Verify current package versions and read current docs before using an API; flag deprecations.
-- Small Conventional Commits, one per finished step. ADR for every significant choice.
+- Small Conventional Commits, one per finished step. **The maintainer commits; agents never commit or push**, they propose the commit split and messages. ADR for every significant choice.
 - Provider-specific model code lives in one adapter module. Frameworks stay behind small interfaces.
 - No Clevero code, data or terminology. Synthetic data only.
 - Secrets never in prompts, logs or events. Generated code runs only in the sandbox. Nothing goes public without admin approval.
