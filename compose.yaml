@@ -86,6 +86,31 @@ services:
       redis:
         condition: service_healthy
 
+  # Identity provider (ADR-0003). Realm config is code: infra/keycloak/staffroom-realm.json,
+  # imported on first start. Dev mode + embedded H2 store, persisted in a volume.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ["start-dev", "--import-realm"]
+    restart: unless-stopped
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HEALTH_ENABLED: "true"
+      # Fixed public URL, so token issuers match whether called from host or containers.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    ports:
+      - 127.0.0.1:${KEYCLOAK_PORT:-8080}:8080
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./infra/keycloak/staffroom-realm.json:/opt/keycloak/data/import/staffroom-realm.json:ro
+    healthcheck:  # image has no curl; management port 9000 serves /health
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
   postgres:
     image: docker.io/postgres:17-alpine
     restart: unless-stopped
@@ -123,5 +148,6 @@ services:
       retries: 10
 
 volumes:
+  keycloak_data:
   postgres_data:
   redis_data:

@@ -69,7 +69,8 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Background worker (M1) | Real | Taskiq on Redis Streams ([ADR-0004](docs/adr/0004-task-queue-taskiq.md)) |
 | Resume after worker crash (M1) | Real | Resumes from the LangGraph Postgres checkpoint without redoing finished tasks (tested + demoed with `kill -9`). Includes a workaround for a taskiq-redis reclaim bug ([ADR-0004](docs/adr/0004-task-queue-taskiq.md)) |
 | Live event stream (M1) | Real | WebSocket `/runs/{id}/stream`: replay + live via Redis Streams, Postgres fallback |
-| Auth (M0) | **Stubbed** | Tenant comes from an `X-Tenant-ID` header; do not expose publicly |
+| Identity provider: Keycloak with organizations (M0) | Real | Realm as code ([ADR-0003](docs/adr/0003-auth-keycloak.md)); demo founders for Acme and Globex |
+| API token verification | **Stubbed** | API still trusts an `X-Tenant-ID` header; next step wires Keycloak tokens in. Do not expose publicly |
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox and tools (M2) | Planned | |
 | Office UI (M3) | Planned | |
@@ -106,6 +107,8 @@ curl -s localhost:8000/employees -H "X-Tenant-ID: $T"
 # watch a whole run live (creates a demo team, starts a goal, prints WebSocket events)
 uv run scripts/watch_run.py "Build me an LLM wrapper website"
 ```
+
+Keycloak (identity): http://localhost:8080 (admin console: `admin` / `admin`). Demo founders: `founder@acme.test` and `founder@globex.test`, password `staffroom-dev`.
 
 Langfuse login with the dev defaults from `.env.example`: `admin@staffroom.local` / `staffroom-dev`.
 

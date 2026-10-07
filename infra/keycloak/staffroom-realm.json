@@ -1,0 +1,157 @@
+{
+  "realm": "staffroom",
+  "displayName": "Staffroom",
+  "enabled": true,
+  "organizationsEnabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 300,
+  "clients": [
+    {
+      "clientId": "staffroom-office",
+      "name": "Staffroom office (browser)",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience staffroom-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "staffroom-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "tenants (organization ids)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-organization-membership-mapper",
+          "config": {
+            "claim.name": "tenants",
+            "multivalued": "true",
+            "jsonType.label": "JSON",
+            "addOrganizationId": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "staffroom-dev-cli",
+      "name": "DEV ONLY: password grant for curl/tests. Never enable outside local dev.",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "audience staffroom-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "staffroom-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "tenants (organization ids)",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-organization-membership-mapper",
+          "config": {
+            "claim.name": "tenants",
+            "multivalued": "true",
+            "jsonType.label": "JSON",
+            "addOrganizationId": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "founder@acme.test",
+      "email": "founder@acme.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Avery",
+      "lastName": "Acme",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "staffroom-dev",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "founder@globex.test",
+      "email": "founder@globex.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Gale",
+      "lastName": "Globex",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "staffroom-dev",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "organizations": [
+    {
+      "id": "0b9c4a6e-6d2f-4c1b-9a51-1f2e3d4c5b6a",
+      "name": "Acme",
+      "alias": "acme",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "acme.test",
+          "verified": false
+        }
+      ],
+      "members": [
+        {
+          "username": "founder@acme.test",
+          "membershipType": "MANAGED"
+        }
+      ]
+    },
+    {
+      "id": "7e1d2c3b-4a59-4f68-8e7d-6c5b4a392817",
+      "name": "Globex",
+      "alias": "globex",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "globex.test",
+          "verified": false
+        }
+      ],
+      "members": [
+        {
+          "username": "founder@globex.test",
+          "membershipType": "MANAGED"
+        }
+      ]
+    }
+  ]
+}
