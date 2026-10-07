@@ -5,7 +5,8 @@ langchain-core's fakes replay a fixed script and none implements `bind_tools`
 so tool names are not known in advance; this fake reacts to whatever is bound,
 doing what a sensible real model would (sequentially, never racing its own steps):
 
-- coordinator (delegation tools)  -> delegate build work, then testing, then summarise
+- coordinator (assign_* tools)    -> delegate build work, then testing, then summarise
+- employee whose task says "ASK:" -> ask the admin (interrupt), then use the answer
 - tester (browser tools)          -> open the live preview, read the page, report
 - builder (sandbox tools)         -> write a page, list the site with node, report
 - no tools                        -> report the request as done
@@ -23,6 +24,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
 SANDBOX_TOOLS = {"write_file", "execute"}
+ASK = "ASK:"  # test/demo trigger: "... ASK: which colours do you like?"
 BROWSER_TOOLS = {"browser_navigate", "browser_snapshot"}
 SITE, PORT = "/workspace/site", 4173
 LIST_SITE = (
@@ -67,12 +69,15 @@ class RuleBasedFakeModel(BaseChatModel):
         # `.text` joins content blocks; MCP tools return lists of blocks, not strings.
         results = [str(m.text) for m in messages if isinstance(m, ToolMessage)]
         tools = set(self.tool_names)
+        delegation = tuple(t for t in self.tool_names if t.startswith("assign_"))
+        if delegation:
+            return _coordinator_step(request, results, delegation)
+        if "ask_admin" in tools and ASK in request:
+            return _asking_step(request, results)
         if tools >= BROWSER_TOOLS:
             return _tester_step(request, results)
         if tools >= SANDBOX_TOOLS:
             return _builder_step(request, results)
-        if tools:
-            return _coordinator_step(request, results, self.tool_names)
         return AIMessage(content=f"Done: {request}")
 
 
@@ -85,6 +90,14 @@ def _coordinator_step(request: str, results: list[str], tool_names: tuple[str, .
     if build and test and len(results) == len(build):
         return _calls([(t, {"task": f"Check the site in a browser [{t}]"}) for t in test])
     return AIMessage(content="All done. " + " | ".join(results))
+
+
+def _asking_step(request: str, results: list[str]) -> AIMessage:
+    """Tasks containing "ASK: <question>" make the employee ask the admin first."""
+    if not results:
+        question = request.split(ASK, 1)[1].split("[assign_")[0].strip()
+        return _calls([("ask_admin", {"question": question})])
+    return AIMessage(content=f"Done, using the admin's answer. {results[-1]}")
 
 
 def _builder_step(request: str, results: list[str]) -> AIMessage:

@@ -40,6 +40,22 @@ class TaskFailed(BaseModel):
     error: str  # exception type only: messages may contain secrets
 
 
+class InputNeeded(BaseModel):
+    """An employee is blocked and asked the admin (LangGraph interrupt). Becomes an inbox item."""
+
+    type: Literal["input_needed"] = "input_needed"
+    question_id: str  # the LangGraph interrupt id; answers are matched to it on resume
+    employee: str
+    question: str
+
+
+class RunWaiting(BaseModel):
+    """The run paused until the admin answers; no worker or queue message is held."""
+
+    type: Literal["run_waiting"] = "run_waiting"
+    open_questions: int
+
+
 class RunFinished(BaseModel):
     type: Literal["run_finished"] = "run_finished"
     summary: str
@@ -51,7 +67,15 @@ class RunFailed(BaseModel):
 
 
 TeamEvent = Annotated[
-    RunStarted | RunResumed | TaskAssigned | TaskFinished | TaskFailed | RunFinished | RunFailed,
+    RunStarted
+    | RunResumed
+    | TaskAssigned
+    | TaskFinished
+    | TaskFailed
+    | InputNeeded
+    | RunWaiting
+    | RunFinished
+    | RunFailed,
     Field(discriminator="type"),
 ]
 team_event = TypeAdapter[TeamEvent](TeamEvent)

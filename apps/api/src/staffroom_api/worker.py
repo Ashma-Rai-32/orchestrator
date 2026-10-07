@@ -20,7 +20,7 @@ from staffroom_api.broker import ReclaimingRedisStreamBroker
 from staffroom_api.db.models import Employee, Run
 from staffroom_api.db.tenancy import tenant_transaction
 from staffroom_api.observability import init_tracing, shutdown_tracing
-from staffroom_api.runs import execute_run
+from staffroom_api.runs import execute_run, fail_run
 from staffroom_api.sandbox import run_sandbox
 from staffroom_api.settings import Settings
 
@@ -74,19 +74,24 @@ async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepe
 
     # Checkpoints make the run resumable: if this worker dies, the redelivered
     # message lands on another worker, which continues from the last checkpoint.
-    async with (
-        run_checkpointer(s, tid) as checkpointer,
-        run_sandbox(s, tid, rid) as sandbox,
-        open_toolsets(toolsets_needed(employees), sandbox) as toolsets,
-    ):
-        team = build_team(
-            employees,
-            model=partial(chat_model, s.staffroom_model, s.model_requests_per_second),
-            fallbacks=lambda: [
-                chat_model(m, s.model_requests_per_second) for m in s.staffroom_fallback_models
-            ],
-            checkpointer=checkpointer,
-            sandbox=sandbox,
-            toolsets=toolsets,
-        )
-        await execute_run(db, redis, tid, rid, team, goal)
+    try:
+        async with (
+            run_checkpointer(s, tid) as checkpointer,
+            run_sandbox(s, tid, rid) as sandbox,
+            open_toolsets(toolsets_needed(employees), sandbox) as toolsets,
+        ):
+            team = build_team(
+                employees,
+                model=partial(chat_model, s.staffroom_model, s.model_requests_per_second),
+                fallbacks=lambda: [
+                    chat_model(m, s.model_requests_per_second) for m in s.staffroom_fallback_models
+                ],
+                checkpointer=checkpointer,
+                sandbox=sandbox,
+                toolsets=toolsets,
+            )
+            await execute_run(db, redis, tid, rid, team, goal)
+    except Exception as exc:
+        # Setup failed (sandbox, browser, model config...): fail visibly. Found when a
+        # misconfigured fallback model left runs stuck in `queued` forever.
+        await fail_run(db, redis, tid, rid, exc)

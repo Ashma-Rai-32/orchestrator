@@ -25,12 +25,16 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, StructuredTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.errors import GraphBubbleUp
 from langgraph.prebuilt import ToolRuntime
+from langgraph.types import Command, interrupt
 
 from staffroom_api.agents.events import (
+    InputNeeded,
     RunFinished,
     RunResumed,
     RunStarted,
+    RunWaiting,
     TaskAssigned,
     TaskFailed,
     TaskFinished,
@@ -85,6 +89,7 @@ class Team(Protocol):
         goal: str,
         thread_id: str | None = None,
         callbacks: list[BaseCallbackHandler] | None = None,
+        answers: Mapping[str, str] | None = None,
     ) -> AsyncIterator[TeamEvent]: ...
     async def run(self, goal: str) -> TeamResult: ...
 
@@ -110,8 +115,9 @@ class _LangGraphTeam:
         toolsets: Mapping[str, list[BaseTool]],
         fallbacks: FallbacksFactory,
     ) -> None:
+        durable = checkpointer is not None
         agents = {
-            e.name: self._employee_agent(e, model(), sandbox, toolsets, fallbacks)
+            e.name: self._employee_agent(e, model(), sandbox, toolsets, fallbacks, durable)
             for e in employees
         }
 
@@ -138,6 +144,7 @@ class _LangGraphTeam:
         sandbox: SandboxBackendProtocol | None,
         toolsets: Mapping[str, list[BaseTool]],
         fallbacks: FallbacksFactory,
+        durable: bool,
     ) -> Any:
         profile = merge_skills(e.skills)
         # Skill-specific tools, e.g. the browser for `testing` (catalog.toml `tools`).
@@ -152,11 +159,14 @@ class _LangGraphTeam:
             middleware.append(FilesystemMiddleware(backend=sandbox))
         return create_agent(
             model,
-            tools=skill_tools,
+            tools=[*skill_tools, _ask_admin_tool(e.name)],
             system_prompt=employee_prompt(profile.system_prompt, sandbox is not None),
             middleware=middleware,
             name=e.name,
-            checkpointer=False,  # don't inherit the coordinator's; a task is redone as a whole
+            # Inherit the coordinator's checkpointer (namespaced per task). Experiment: with
+            # False, an employee resumed after ask_admin restarted from scratch and never
+            # received the answer; with True it continues exactly where it paused.
+            checkpointer=True if durable else None,
         )
 
     async def stream(
@@ -164,8 +174,13 @@ class _LangGraphTeam:
         goal: str,
         thread_id: str | None = None,
         callbacks: list[BaseCallbackHandler] | None = None,
+        answers: Mapping[str, str] | None = None,
     ) -> AsyncIterator[TeamEvent]:
         """Yield domain events while the team works.
+
+        Ends with RunFinished, or with InputNeeded per open question + RunWaiting when an
+        employee asked the admin (LangGraph interrupt). Calling again with `answers`
+        ({question_id: answer}) resumes the paused employees exactly where they stopped.
 
         Tools emit task events on LangGraph's `custom` stream; `values` gives the
         final state, whose last message is the coordinator's summary.
@@ -179,7 +194,7 @@ class _LangGraphTeam:
         saved = await self._coordinator.aget_state(config) if thread_id else None
         if saved is not None and saved.next:
             yield RunResumed(from_step=", ".join(saved.next))
-            inputs: Any = None
+            inputs: Any = Command(resume=dict(answers)) if answers else None
         else:
             yield RunStarted(goal=goal)
             inputs = {"messages": [{"role": "user", "content": goal}]}
@@ -192,6 +207,20 @@ class _LangGraphTeam:
                 yield team_event.validate_python(part["data"])
             elif part["type"] == "values":
                 final = part["data"]
+
+        if thread_id:
+            pending = [
+                i for t in (await self._coordinator.aget_state(config)).tasks for i in t.interrupts
+            ]
+            if pending:
+                for question in pending:
+                    yield InputNeeded(
+                        question_id=question.id,
+                        employee=question.value["employee"],
+                        question=question.value["question"],
+                    )
+                yield RunWaiting(open_questions=len(pending))
+                return
         yield RunFinished(summary=str(final["messages"][-1].text))
 
     async def run(self, goal: str) -> TeamResult:
@@ -212,6 +241,26 @@ class _LangGraphTeam:
             elif isinstance(event, RunFinished):
                 result.summary = event.summary
         return result
+
+
+ASK_ADMIN_DOC = (
+    "Ask the founder (the admin) when you are truly blocked: information only they have, "
+    "a decision only they can make, or an account/API key. Ask one clear question in plain, "
+    "non-technical language. The work pauses until they answer, possibly for hours, so "
+    "decide everything you reasonably can yourself. For credentials, ask for the key to be "
+    "added and you will receive its name, never the secret itself."
+)
+
+
+def _ask_admin_tool(employee: str) -> BaseTool:
+    """Pause the run with a question for the admin's inbox (LangGraph interrupt)."""
+
+    def ask_admin(question: str) -> str:
+        # No side effects before interrupt(): on resume this tool runs again from the top.
+        answer = interrupt({"employee": employee, "question": question})
+        return f"The admin answered: {answer}"
+
+    return StructuredTool.from_function(ask_admin, name="ask_admin", description=ASK_ADMIN_DOC)
 
 
 def _pool_tool(skills: tuple[str, ...], names: list[str], agents: dict[str, Any]) -> BaseTool:
@@ -244,6 +293,10 @@ def _pool_tool(skills: tuple[str, ...], names: list[str], agents: dict[str, Any]
                 result = await agents[name].ainvoke(
                     {"messages": [{"role": "user", "content": task}]}
                 )
+            except GraphBubbleUp:
+                # LangGraph control flow (interrupt() for ask_admin), not a failure: let it
+                # pause the run. Found by test: catching it reported the task as failed.
+                raise
             except Exception as exc:
                 log.exception("%s failed a task", name)
                 # Only the error type leaves the worker (messages may contain secrets).

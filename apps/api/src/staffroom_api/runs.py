@@ -41,10 +41,17 @@ async def execute_run(
                     )
                 await _record(engine, redis, tenant_id, run_id, event)
     except Exception as exc:
-        # Full error to server logs only; events reach the UI and must not carry secrets.
-        log.exception("run %s failed", run_id)
-        await _set_status(engine, tenant_id, run_id, status="failed")
-        await _record(engine, redis, tenant_id, run_id, RunFailed(error=type(exc).__name__))
+        await fail_run(engine, redis, tenant_id, run_id, exc)
+
+
+async def fail_run(
+    engine: AsyncEngine, redis: Redis, tenant_id: uuid.UUID, run_id: uuid.UUID, exc: Exception
+) -> None:
+    """Mark the run failed. Full error to server logs only: events reach the UI and must
+    not carry secrets, so they get the exception type alone."""
+    log.exception("run %s failed", run_id, exc_info=exc)
+    await _set_status(engine, tenant_id, run_id, status="failed")
+    await _record(engine, redis, tenant_id, run_id, RunFailed(error=type(exc).__name__))
 
 
 async def _record(

@@ -97,6 +97,8 @@ def api_settings(postgres: PostgresContainer, rls_db: dict[str, str]) -> Setting
         app_db_password=SecretStr(APP_PASSWORD),
         # Deterministic, whatever the developer's .env says (e.g. a real local model).
         staffroom_model="fake",
+        staffroom_fallback_models=[],
+        model_requests_per_second=None,
         sandbox_backend="none",
         langfuse_public_key=None,
         langfuse_secret_key=None,

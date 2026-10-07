@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
+from staffroom_api.agents.events import InputNeeded, TaskFinished
 from staffroom_api.agents.fake import RuleBasedFakeModel
 from staffroom_api.agents.models import chat_model
 from staffroom_api.agents.team import EmployeeSpec, TeamResult, build_team, employee_prompt
@@ -130,3 +131,33 @@ async def test_falls_back_to_the_next_model_when_the_main_one_errors() -> None:
     events = [e.type async for e in team.stream("goal")]
     assert "task_failed" not in events
     assert events[-1] == "run_finished"
+
+
+async def test_employee_asks_the_admin_run_waits_then_resumes_with_the_answer() -> None:
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    team = build_team(
+        [EmployeeSpec("Robin", ["react"])],
+        model=lambda: chat_model("fake"),
+        checkpointer=InMemorySaver(),
+    )
+    goal = "Build a site. ASK: which colour should the buttons be?"
+
+    paused = [e async for e in team.stream(goal, thread_id="tenant:run-1")]
+    assert [e.type for e in paused][-2:] == ["input_needed", "run_waiting"]
+    question = paused[-2]
+    assert isinstance(question, InputNeeded)
+    assert question.employee == "Robin"
+    assert question.question == "which colour should the buttons be?"
+    assert "run_finished" not in [e.type for e in paused]
+
+    resumed = [
+        e
+        async for e in team.stream(
+            goal, thread_id="tenant:run-1", answers={question.question_id: "teal"}
+        )
+    ]
+    finished = [e for e in resumed if isinstance(e, TaskFinished)]
+    assert len(finished) == 1
+    assert "The admin answered: teal" in finished[0].result
+    assert resumed[-1].type == "run_finished"
