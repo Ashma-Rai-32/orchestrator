@@ -18,6 +18,7 @@ from deepagents.backends.protocol import SandboxBackendProtocol
 from deepagents.middleware.filesystem import FilesystemMiddleware
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models import BaseChatModel
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, StructuredTool
@@ -63,7 +64,12 @@ class TeamResult:
 
 
 class Team(Protocol):
-    def stream(self, goal: str, thread_id: str | None = None) -> AsyncIterator[TeamEvent]: ...
+    def stream(
+        self,
+        goal: str,
+        thread_id: str | None = None,
+        callbacks: list[BaseCallbackHandler] | None = None,
+    ) -> AsyncIterator[TeamEvent]: ...
     async def run(self, goal: str) -> TeamResult: ...
 
 
@@ -120,7 +126,12 @@ class _LangGraphTeam:
             checkpointer=False,  # don't inherit the coordinator's; a task is redone as a whole
         )
 
-    async def stream(self, goal: str, thread_id: str | None = None) -> AsyncIterator[TeamEvent]:
+    async def stream(
+        self,
+        goal: str,
+        thread_id: str | None = None,
+        callbacks: list[BaseCallbackHandler] | None = None,
+    ) -> AsyncIterator[TeamEvent]:
         """Yield domain events while the team works.
 
         Tools emit task events on LangGraph's `custom` stream; `values` gives the
@@ -130,6 +141,8 @@ class _LangGraphTeam:
         last checkpoint: input `None` tells LangGraph to continue, not restart.
         """
         config: RunnableConfig = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        # Tracing callbacks; employees' nested runs inherit them through the run context.
+        config["callbacks"] = callbacks or []
         saved = await self._coordinator.aget_state(config) if thread_id else None
         if saved is not None and saved.next:
             yield RunResumed(from_step=", ".join(saved.next))

@@ -87,6 +87,10 @@ services:
       SANDBOX_BACKEND: ${SANDBOX_BACKEND:-docker}
       SANDBOX_IMAGE: staffroom-sandbox:dev
       DOCKER_HOST: tcp://docker-proxy:2375
+      # Tracing (ADR-0008): on when keys are set (.env); needs --profile observability.
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_BASE_URL: http://langfuse-web:3000
     depends_on:
       migrate:
         condition: service_completed_successfully

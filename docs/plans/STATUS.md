@@ -24,8 +24,10 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [x] M2: hardened Docker sandbox per run (ADR-0006), deepagents FilesystemMiddleware tools for employees, Playwright MCP inside the sandbox (docs/frameworks/playwright-mcp.md).
 - [x] M2: skill catalog `tools` → toolsets (`agents/toolsets.py`); Testing skill gets the browser; live run verified (builders build, tester checks in Chromium).
 - [x] M3: office UI (Phaser 4, Vite, Tiled map + desk spots, generated placeholder art), Keycloak sign-in via oidc-client-ts, live run visualisation over WebSocket. Verified in a real browser.
-- [ ] Next: M4 real model end-to-end run + Langfuse tracing (observability ADR). Needs an LLM API key from the maintainer.
-- [ ] Office polish backlog: pathfinding around desks, real CC0 art, inbox panel (interrupts), hire UI.
+- [x] M4a: Langfuse tracing (ADR-0008); verified live, incl. secret masking (a leak in framework objects was found and fixed).
+- [ ] M4b: real model end-to-end run. Needs an LLM API key from the maintainer.
+- [ ] Secrets: inbox form → secret store; agents get secret names only (also covers secrets typed into goals).
+- [ ] Office polish backlog (deferred by maintainer, 2026-10-07: "do it later"): real CC0 art (Kenney; isometric option), pathfinding, character variants, inbox panel, hire UI. Decision: stay 2D; no 3D.
 - Learned: use `message.text` (not `str(content)`): MCP tools and real models return content-block lists; `.text` is a `TextAccessor` str subclass in langchain-core 1.6.
 - [ ] Deferred until the maintainer has a key: E2B backend behind `SANDBOX_BACKEND=e2b` (check langchain-e2b vs deepagents 0.7 pin).
 - [ ] Remaining M0 ADR: observability (Langfuse wiring) — next free ADR number.

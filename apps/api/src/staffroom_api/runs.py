@@ -14,6 +14,7 @@ from staffroom_api.agents.events import RunFailed, RunFinished, TeamEvent
 from staffroom_api.agents.team import Team
 from staffroom_api.db.models import Event, Run
 from staffroom_api.db.tenancy import tenant_transaction
+from staffroom_api.observability import run_tracing
 
 log = logging.getLogger(__name__)
 
@@ -30,12 +31,15 @@ async def execute_run(
     # Each write is its own short transaction: nothing is held open while agents think.
     await _set_status(engine, tenant_id, run_id, status="running")
     try:
-        async for event in team.stream(goal, thread_id=thread_id(tenant_id, run_id)):
-            if isinstance(event, RunFinished):
-                await _set_status(
-                    engine, tenant_id, run_id, status="succeeded", summary=event.summary
-                )
-            await _record(engine, redis, tenant_id, run_id, event)
+        with run_tracing(tenant_id, run_id) as callbacks:
+            async for event in team.stream(
+                goal, thread_id=thread_id(tenant_id, run_id), callbacks=callbacks
+            ):
+                if isinstance(event, RunFinished):
+                    await _set_status(
+                        engine, tenant_id, run_id, status="succeeded", summary=event.summary
+                    )
+                await _record(engine, redis, tenant_id, run_id, event)
     except Exception as exc:
         # Full error to server logs only; events reach the UI and must not carry secrets.
         log.exception("run %s failed", run_id)

@@ -41,7 +41,7 @@ extend-immutable-calls = ["taskiq.TaskiqDepends", "fastapi.Depends", "fastapi.Qu
 known-first-party = ["staffroom_api"]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S101", "S106"]  # asserts and throwaway test-container passwords
+"**/tests/**" = ["S101", "S105", "S106"]  # asserts, fake secrets, throwaway passwords
 
 [tool.mypy]
 python_version = "3.12"

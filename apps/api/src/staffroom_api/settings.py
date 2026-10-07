@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     sandbox_image: str = "staffroom-sandbox:dev"
     sandbox_runtime: str | None = None  # e.g. "runsc" for gVisor, if installed
 
+    # Tracing (ADR-0008). Off unless both keys are set.
+    environment: str = "development"
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    langfuse_base_url: str = "http://localhost:3000"
+
     # Task queue (ADR-0004). "memory" runs tasks inline (tests).
     task_broker: Literal["redis", "memory"] = "redis"
     # A run segment must finish before its message can be re-claimed by another worker.

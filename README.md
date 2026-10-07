@@ -76,6 +76,7 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Agent file + execute tools (M2) | Real | deepagents `FilesystemMiddleware`; one workspace volume per run, kept after the run |
 | Browser tools: Playwright MCP in the sandbox (M2) | Real | Employees with the Testing skill check the built site in Chromium; langchain-mcp-adapters over `docker exec` stdio; curated tool set |
 | Office UI (M3) | Real | Phaser 4 + Vite, Tiled map; Keycloak sign-in (oidc-client-ts, PKCE); start a goal, watch employees walk to the huddle, work and finish live (WebSocket). Placeholder art, straight-line walking (no pathfinding yet) |
+| Tracing: Langfuse (M4) | Real | One trace per run (session = run, user = tenant), every model/tool call nested; secrets masked before export ([ADR-0008](docs/adr/0008-observability-langfuse.md)). Needs `--profile observability` |
 | Real model end-to-end run (M4) | Planned | |
 | Durability across restarts / logout (M5) | Planned | |
 | Deploy with admin approval (M6) | Planned | |

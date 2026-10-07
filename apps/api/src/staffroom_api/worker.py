@@ -19,6 +19,7 @@ from staffroom_api.agents.toolsets import open_toolsets
 from staffroom_api.broker import ReclaimingRedisStreamBroker
 from staffroom_api.db.models import Employee, Run
 from staffroom_api.db.tenancy import tenant_transaction
+from staffroom_api.observability import init_tracing, shutdown_tracing
 from staffroom_api.runs import execute_run
 from staffroom_api.sandbox import run_sandbox
 from staffroom_api.settings import Settings
@@ -41,6 +42,7 @@ broker = _make_broker(settings)
 
 @broker.on_event(TaskiqEvents.WORKER_STARTUP)
 async def _startup(state: TaskiqState) -> None:
+    init_tracing(settings)
     state.db = create_async_engine(settings.database_url, pool_pre_ping=True)
     state.redis = Redis.from_url(settings.redis_url, socket_timeout=5)
     state.settings = settings
@@ -48,6 +50,7 @@ async def _startup(state: TaskiqState) -> None:
 
 @broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
 async def _shutdown(state: TaskiqState) -> None:
+    shutdown_tracing()
     await state.redis.aclose()
     await state.db.dispose()
 
