@@ -10,7 +10,7 @@ _Last updated: 2026-10-07_
 
 - [x] Increment 1: model from config (`init_chat_model`) + scripted fake model (`GenericFakeChatModel`); same calling code.
 - [x] Increment 2: tool calling. `@tool` → schema; scripted `tool_calls`; `tool.invoke(tool_call)` returns a linked `ToolMessage`. No fake in langchain-core or langchain-tests implements `bind_tools` → 5-line `FakeToolCallingModel` subclass (only custom code). Open gotcha: a tool returning `list[str]` becomes list `ToolMessage.content`; check how real providers treat it.
-- [ ] Increment 3: structured output (`with_structured_output`).
+- [x] Increment 3: structured output. Default `with_structured_output` = schema bound as a forced tool + `PydanticToolsParser` (so the fake works by scripting a tool call named after the class). `include_raw=True` returns `{raw, parsed, parsing_error}` instead of raising. Anthropic also offers `method="json_schema"` (native structured outputs); compare with a real model later.
 - [ ] Increment 4: resilience (`with_fallbacks`, `InMemoryRateLimiter`, retries).
 - [ ] Increment 5: `test_spike.py` + `docs/frameworks/langchain-models.md`.
 

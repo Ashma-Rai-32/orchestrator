@@ -11,6 +11,7 @@ Questions:
   1. Can we pick the model provider from config alone, and swap in a
      deterministic fake model for tests, without changing calling code?
   2. How does tool calling work, and can the fake model take part in it?
+  3. Can we get validated Pydantic objects back (e.g. a coordinator's plan)?
 
 Run:  uv run spikes/langchain-models/main.py
 Real: STAFFROOM_REAL_MODEL=1 ANTHROPIC_API_KEY=... uv run spikes/langchain-models/main.py
@@ -27,6 +28,7 @@ from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.tools import tool
 from langchain_core.utils.function_calling import convert_to_openai_tool
+from pydantic import BaseModel, Field
 
 # Pinned model ID, not an alias (init_chat_model docs recommend this).
 DEFAULT_MODEL = "anthropic:claude-haiku-4-5-20251001"
@@ -127,7 +129,57 @@ def demo_tool_calling() -> None:
     print(f"model turn 2 -> {final.content}")
 
 
+class Task(BaseModel):
+    title: str
+    skill: str = Field(description="Skill needed, e.g. 'React'")
+
+
+class Plan(BaseModel):
+    """A coordinator's plan for reaching the admin's goal."""
+
+    summary: str
+    tasks: list[Task] = Field(min_length=1)
+
+
+def demo_structured_output() -> None:
+    print("\n== 4. Structured output ==")
+    good_plan = {
+        "summary": "Landing page that wraps an LLM",
+        "tasks": [
+            {"title": "Build the UI", "skill": "React"},
+            {"title": "Call the model API", "skill": "AI integration"},
+        ],
+    }
+    bad_plan = {"summary": "Nothing to do", "tasks": []}  # violates min_length=1
+
+    # By default the schema is offered to the model as a tool named "Plan" that it
+    # must call; the tool-call args are then validated into a Plan. So the fake
+    # model takes part by scripting a call to a tool named "Plan".
+    model = get_model(
+        script=[
+            AIMessage(content="", tool_calls=[{"name": "Plan", "args": good_plan, "id": "p1"}]),
+            AIMessage(content="", tool_calls=[{"name": "Plan", "args": bad_plan, "id": "p2"}]),
+        ]
+    )
+
+    planner = model.with_structured_output(Plan)
+    plan = planner.invoke("Goal: build me an LLM wrapper website")
+    print(f"returned type: {type(plan).__name__}")
+    for task in plan.tasks:
+        print(f"  - {task.title} [{task.skill}]")
+
+    # include_raw=True: never raises on bad output; returns raw message + error
+    # instead, so the caller can retry or ask the model to fix it.
+    safe_planner = model.with_structured_output(Plan, include_raw=True)
+    result = safe_planner.invoke("Goal: do nothing")
+    print(f"\ninclude_raw keys: {list(result)}")
+    print(f"parsed: {result['parsed']}")
+    print(f"parsing_error: {type(result['parsing_error']).__name__}: "
+          f"{str(result['parsing_error']).splitlines()[0]}")
+
+
 if __name__ == "__main__":
     demo_same_calling_code()
     demo_configurable_model()
     demo_tool_calling()
+    demo_structured_output()
