@@ -81,7 +81,7 @@ async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepe
     ):
         team = build_team(
             employees,
-            model=partial(chat_model, s.staffroom_model),
+            model=partial(chat_model, s.staffroom_model, s.model_requests_per_second),
             checkpointer=checkpointer,
             sandbox=sandbox,
             toolsets=toolsets,

@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     # "fake" (deterministic, no key) or "<provider>:<pinned model id>" for init_chat_model.
     staffroom_model: str = "fake"
+    # Throttle real model calls per worker process (free tiers allow few requests/minute).
+    model_requests_per_second: float | None = None
 
     # Browsers allowed to call the API (the office UI's origin).
     cors_origins: list[str] = ["http://localhost:5173"]

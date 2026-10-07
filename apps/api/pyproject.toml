@@ -15,6 +15,7 @@ dependencies = [
     "langgraph>=1.2.14",
     "langchain-anthropic>=1.7.5",  # provider packages are only used via init_chat_model
     "langchain-ollama>=1.1.0",  # local models (keyless, free)
+    "langchain-google-genai>=4.4.0",  # Gemini (free tier via AI Studio key)
     "langgraph-checkpoint-postgres>=3.1.2",
     "psycopg[binary]>=3.3.6",  # driver used by the LangGraph Postgres checkpointer
     "taskiq>=0.13.0",
