@@ -19,4 +19,8 @@ USER node
 WORKDIR /workspace
 ENV HOME=/tmp NPM_CONFIG_CACHE=/tmp/.npm
 
-CMD ["sleep", "infinity"]
+# Live preview of the workspace (testers' browser, and later the admin's deploy preview).
+# Real-model finding: a model could not keep its own server alive across separate
+# commands, so the sandbox provides one. Loopback only: nothing outside can reach it.
+EXPOSE 4173
+CMD ["python3", "-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "/workspace"]

@@ -25,7 +25,8 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [x] M2: skill catalog `tools` → toolsets (`agents/toolsets.py`); Testing skill gets the browser; live run verified (builders build, tester checks in Chromium).
 - [x] M3: office UI (Phaser 4, Vite, Tiled map + desk spots, generated placeholder art), Keycloak sign-in via oidc-client-ts, live run visualisation over WebSocket. Verified in a real browser.
 - [x] M4a: Langfuse tracing (ADR-0008); verified live, incl. secret masking (a leak in framework objects was found and fixed).
-- [ ] M4b: real model end-to-end run. Needs an LLM API key from the maintainer.
+- [x] M4b (mostly): real models via Ollama (slow locally) and Gemini free tier; 6 robustness bugs found by real runs and fixed; Gemini built a real landing page. Free tier = 20 requests/day per model → main model gemini-3.5-flash-lite + ModelFallbackMiddleware chain across free models.
+- [ ] **Next: M6** (plan in roadmap.md): 6.1 inbox via interrupts → 6.2 secret store → 6.3 deploy with approval → 6.4 office inbox. Then M7 evals.
 - [ ] Secrets: inbox form → secret store; agents get secret names only (also covers secrets typed into goals).
 - [ ] Office polish backlog (deferred by maintainer, 2026-10-07: "do it later"): real CC0 art (Kenney; isometric option), pathfinding, character variants, inbox panel, hire UI. Decision: stay 2D; no 3D.
 - Learned: use `message.text` (not `str(content)`): MCP tools and real models return content-block lists; `.text` is a `TextAccessor` str subclass in langchain-core 1.6.

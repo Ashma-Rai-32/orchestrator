@@ -28,8 +28,7 @@ def anyio_backend() -> str:
 @pytest.fixture
 def site() -> Iterator[DockerSandbox]:
     sandbox = DockerSandbox(uuid.uuid4(), uuid.uuid4(), image="staffroom-sandbox:dev")
-    sandbox.write("/workspace/site/index.html", PAGE)
-    sandbox.execute("cd /workspace/site && (nohup python3 -m http.server 4173 >/dev/null 2>&1 &)")
+    sandbox.write("/workspace/site/index.html", PAGE)  # served by the sandbox's preview
     yield sandbox
     sandbox.close(keep_workspace=False)
 
@@ -38,7 +37,7 @@ async def test_browser_sees_the_site_built_in_the_sandbox(site: DockerSandbox) -
     async with browser_tools(site.id) as tools:
         by_name = {t.name: t for t in tools}
         await by_name["browser_wait_for"].ainvoke({"time": 1})
-        await by_name["browser_navigate"].ainvoke({"url": "http://localhost:4173/"})
+        await by_name["browser_navigate"].ainvoke({"url": "http://localhost:4173/site/"})
         snapshot = str(await by_name["browser_snapshot"].ainvoke({}))
 
     assert 'heading "Chat with Acme AI"' in snapshot

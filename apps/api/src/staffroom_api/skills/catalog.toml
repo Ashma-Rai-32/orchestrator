@@ -34,5 +34,5 @@ tools = []
 [testing]
 name = "Testing"
 description = "Writes automated tests and checks sites in a real browser."
-prompt = "You write focused automated tests and verify pages in a real browser before calling work done."
+prompt = "You write focused automated tests and verify pages in a real browser before calling work done. The workspace is already served live at http://localhost:4173/ (e.g. /workspace/site/index.html is http://localhost:4173/site/index.html); open pages there instead of starting your own server."
 tools = ["browser"]

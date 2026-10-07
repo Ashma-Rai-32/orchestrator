@@ -6,7 +6,7 @@ so tool names are not known in advance; this fake reacts to whatever is bound,
 doing what a sensible real model would (sequentially, never racing its own steps):
 
 - coordinator (delegation tools)  -> delegate build work, then testing, then summarise
-- tester (browser tools)          -> serve the site, open it, read the page, report
+- tester (browser tools)          -> open the live preview, read the page, report
 - builder (sandbox tools)         -> write a page, list the site with node, report
 - no tools                        -> report the request as done
 """
@@ -29,7 +29,6 @@ LIST_SITE = (
     "node -e \"const fs=require('fs');"
     f"console.log('site pages:', fs.readdirSync('{SITE}').join(', '))\""
 )
-SERVE_SITE = f"mkdir -p {SITE} && (nohup python3 -m http.server {PORT} -d {SITE} >/dev/null 2>&1 &)"
 
 
 class RuleBasedFakeModel(BaseChatModel):
@@ -100,9 +99,9 @@ def _builder_step(request: str, results: list[str]) -> AIMessage:
 
 def _tester_step(request: str, results: list[str]) -> AIMessage:
     steps: list[tuple[str, dict[str, Any]]] = [
-        ("execute", {"command": SERVE_SITE}),
         ("browser_wait_for", {"time": 1}),
-        ("browser_navigate", {"url": f"http://localhost:{PORT}/"}),
+        # The sandbox serves /workspace on PORT already (sandbox/Dockerfile).
+        ("browser_navigate", {"url": f"http://localhost:{PORT}/site/"}),
         ("browser_snapshot", {}),
     ]
     if len(results) < len(steps):

@@ -54,7 +54,8 @@ COORDINATOR_PROMPT = (
 WORKSPACE_PROMPT = (
     "\nThe team's project lives in /workspace (shared with your colleagues). Create and "
     "edit files only under /workspace, for example /workspace/site/index.html. "
-    "Everything outside /workspace is read-only."
+    "Everything outside /workspace is read-only. The workspace is served live at "
+    "http://localhost:4173/ (so /workspace/site/index.html is http://localhost:4173/site/index.html)."
 )
 MAX_MODEL_CALLS_PER_RUN = 20  # runaway guard per agent run
 

@@ -72,5 +72,10 @@ ADRs: 0003 auth · 0004 task queue (Celery vs Dramatiq vs arq vs taskiq) · 0005
 - **M3 Office UI** — Phaser 4, Tiled tilemaps, agents as sprites driven by WS events, inbox UI.
 - **M4 Real models** — one end-to-end run on a real provider.
 - **M5 Durability** — survive worker restart / admin logout via checkpointer.
-- **M6 Deploy with admin approval** — interrupt-gated publish.
+- **M6 Human in the loop + deploy with approval** (agreed order: M6 → M7, small M5 gaps along the way)
+  - **6.1 Inbox**: an employee asks the admin via an `ask_admin` tool → LangGraph `interrupt()` with a typed `response_schema`; run status `waiting`; event `input_needed`; `GET /inbox`, `POST /inbox/{id}/answer` validates the answer and enqueues a new run segment that resumes with `Command(resume=…)`. Segment ends at the interrupt (no queue message held while waiting).
+  - **6.2 Secrets**: answers marked secret go to a per-tenant secret store (choice + ADR: e.g. Postgres + envelope encryption vs. OpenBao/Vault); agents see names only; tools resolve values at execution time (sandbox env), never into prompts, events or traces.
+  - **6.3 Deploy with approval**: `deploy_site` tool → interrupt with a preview; publish only after the admin approves; local target first (static server per tenant), AWS (S3 + CloudFront via Terraform) later.
+  - **6.4 Office**: inbox panel (answer questions, enter secrets, approve deploys); employee shows a "?" bubble while waiting.
+  - Small M5 items alongside: cancel run (API + office button); watchdog for runs stuck in `running`; sandbox cleanup for dead runs.
 - **M7 Research harness** — org configs, benchmark briefs, experiment runner, trace analysis (Langfuse).
