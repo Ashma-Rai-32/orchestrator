@@ -38,6 +38,10 @@ Option 4, Taskiq with `RedisStreamBroker`.
 - Bad: recovery latency after a crash equals `idle_timeout` (configurable; production value to tune).
 - Bad: Taskiq is younger than Celery; fewer operational tools (no Flower equivalent). Mitigated: run status and events are already in Postgres.
 
+## Update 2026-10-07: reclaim only happens when new messages arrive
+
+Found in the crash demo and confirmed in source (taskiq-redis 1.2.4 and upstream `main`): `RedisStreamBroker.listen()` does `if not fetched: continue` *before* its `XAUTOCLAIM` block. On an idle queue, a dead worker's message is never reclaimed; it is reclaimed only after some new message arrives. Resume itself works (verified: `run_resumed` → only the summary step re-ran). Fix pending (see STATUS.md).
+
 ## Sources
 
 - PyPI metadata and installed source of celery 5.6.3, dramatiq 2.2.1, arq 0.28.0 (README), taskiq 0.13.0 (`acks.py`, `receiver/receiver.py`, `brokers/inmemory_broker.py`), taskiq-redis 1.2.4 (`redis_broker.py`).

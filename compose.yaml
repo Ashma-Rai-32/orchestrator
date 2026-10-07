@@ -22,7 +22,11 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    command: ["/app/.venv/bin/alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
+    # Alembic for our tables, then LangGraph's own checkpoint tables (+ their RLS).
+    command:
+      - sh
+      - -c
+      - /app/.venv/bin/alembic -c apps/api/alembic.ini upgrade head && /app/.venv/bin/python -m staffroom_api.agents.checkpoints
     environment:
       <<: *db-env
       # Owner credentials: only the migration job gets these.
@@ -74,6 +78,8 @@ services:
       APP_DB_USER: ${APP_DB_USER:-staffroom_app}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:-staffroom_app}
       STAFFROOM_MODEL: ${STAFFROOM_MODEL:-fake:1}
+      RUN_SEGMENT_TIMEOUT_SECONDS: ${RUN_SEGMENT_TIMEOUT_SECONDS:-1800}
+      REDELIVERY_AFTER_SECONDS: ${REDELIVERY_AFTER_SECONDS:-2100}
     depends_on:
       migrate:
         condition: service_completed_successfully

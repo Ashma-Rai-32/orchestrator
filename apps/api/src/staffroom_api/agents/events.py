@@ -13,6 +13,13 @@ class RunStarted(BaseModel):
     goal: str
 
 
+class RunResumed(BaseModel):
+    """A worker picked the run up again from its last checkpoint (e.g. after a crash)."""
+
+    type: Literal["run_resumed"] = "run_resumed"
+    from_step: str
+
+
 class TaskAssigned(BaseModel):
     type: Literal["task_assigned"] = "task_assigned"
     employee: str
@@ -36,7 +43,7 @@ class RunFailed(BaseModel):
 
 
 TeamEvent = Annotated[
-    RunStarted | TaskAssigned | TaskFinished | RunFinished | RunFailed,
+    RunStarted | RunResumed | TaskAssigned | TaskFinished | RunFinished | RunFailed,
     Field(discriminator="type"),
 ]
 team_event = TypeAdapter[TeamEvent](TeamEvent)

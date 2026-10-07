@@ -9,6 +9,7 @@ from sqlalchemy import insert, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from staffroom_api import event_stream
+from staffroom_api.agents.checkpoints import thread_id
 from staffroom_api.agents.events import RunFailed, RunFinished, TeamEvent
 from staffroom_api.agents.team import Team
 from staffroom_api.db.models import Event, Run
@@ -25,10 +26,11 @@ async def execute_run(
     team: Team,
     goal: str,
 ) -> None:
+    """Run (or resume) a run. Safe to call again for the same run: it continues."""
     # Each write is its own short transaction: nothing is held open while agents think.
     await _set_status(engine, tenant_id, run_id, status="running")
     try:
-        async for event in team.stream(goal):
+        async for event in team.stream(goal, thread_id=thread_id(tenant_id, run_id)):
             if isinstance(event, RunFinished):
                 await _set_status(
                     engine, tenant_id, run_id, status="succeeded", summary=event.summary

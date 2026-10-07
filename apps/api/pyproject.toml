@@ -14,6 +14,8 @@ dependencies = [
     "langchain>=1.4.3",
     "langgraph>=1.2.14",
     "langchain-anthropic>=1.7.5",  # provider packages are only used via init_chat_model
+    "langgraph-checkpoint-postgres>=3.1.2",
+    "psycopg[binary]>=3.3.6",  # driver used by the LangGraph Postgres checkpointer
     "taskiq>=0.13.0",
     "taskiq-redis>=1.2.4",
 ]

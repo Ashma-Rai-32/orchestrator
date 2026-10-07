@@ -2,6 +2,7 @@ import os
 
 os.environ["TASK_BROKER"] = "memory"  # before app imports: tasks run inline (ADR-0004)
 
+import asyncio
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
 
+from staffroom_api.agents import checkpoints
 from staffroom_api.main import create_app
 from staffroom_api.settings import Settings
 
@@ -68,6 +70,7 @@ def rls_db(postgres: PostgresContainer) -> dict[str, str]:
     cfg = Config(str(ALEMBIC_INI))
     cfg.set_main_option("sqlalchemy.url", _url(postgres, driver="asyncpg", **owner))
     command.upgrade(cfg, "head")
+    asyncio.run(checkpoints.setup(_url(postgres, driver="asyncpg", **owner)))
 
     owner_url = _url(postgres, driver="psycopg", **owner)
     engine = create_engine(owner_url)

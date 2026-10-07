@@ -37,7 +37,7 @@ async def _start_broker(app: FastAPI, settings: Settings) -> None:
     if isinstance(broker, InMemoryBroker):
         # Tests: tasks run inline in this process, so share this app's clients.
         broker.state.db, broker.state.redis = app.state.db, app.state.redis
-        broker.state.model = settings.staffroom_model
+        broker.state.settings = settings
     else:
         await broker.startup()  # client side: only connects, to enqueue
 

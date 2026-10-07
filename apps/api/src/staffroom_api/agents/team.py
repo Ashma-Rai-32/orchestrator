@@ -17,11 +17,14 @@ from typing import Any, Protocol
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, StructuredTool
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.prebuilt import ToolRuntime
 
 from staffroom_api.agents.events import (
     RunFinished,
+    RunResumed,
     RunStarted,
     TaskAssigned,
     TaskFinished,
@@ -58,7 +61,7 @@ class TeamResult:
 
 
 class Team(Protocol):
-    def stream(self, goal: str) -> AsyncIterator[TeamEvent]: ...
+    def stream(self, goal: str, thread_id: str | None = None) -> AsyncIterator[TeamEvent]: ...
     async def run(self, goal: str) -> TeamResult: ...
 
 
@@ -66,7 +69,12 @@ ModelFactory = Callable[[], BaseChatModel]
 
 
 class _LangGraphTeam:
-    def __init__(self, employees: list[EmployeeSpec], model: ModelFactory) -> None:
+    def __init__(
+        self,
+        employees: list[EmployeeSpec],
+        model: ModelFactory,
+        checkpointer: BaseCheckpointSaver[Any] | None,
+    ) -> None:
         agents = {e.name: self._employee_agent(e, model()) for e in employees}
 
         pools: dict[tuple[str, ...], list[str]] = defaultdict(list)
@@ -74,8 +82,14 @@ class _LangGraphTeam:
             pools[merge_skills(e.skills).skill_keys].append(e.name)
 
         self.tools = [_pool_tool(skills, names, agents) for skills, names in pools.items()]
+        # Only the coordinator is checkpointed: its checkpoints record which delegations
+        # finished, so a resumed run re-runs only the unfinished ones.
         self._coordinator = create_agent(
-            model(), tools=self.tools, system_prompt=COORDINATOR_PROMPT, name="coordinator"
+            model(),
+            tools=self.tools,
+            system_prompt=COORDINATOR_PROMPT,
+            name="coordinator",
+            checkpointer=checkpointer,
         )
 
     @staticmethod
@@ -86,20 +100,30 @@ class _LangGraphTeam:
             system_prompt=merge_skills(e.skills).system_prompt,
             middleware=[ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS_PER_RUN)],
             name=e.name,
+            checkpointer=False,  # don't inherit the coordinator's; a task is redone as a whole
         )
 
-    async def stream(self, goal: str) -> AsyncIterator[TeamEvent]:
+    async def stream(self, goal: str, thread_id: str | None = None) -> AsyncIterator[TeamEvent]:
         """Yield domain events while the team works.
 
         Tools emit task events on LangGraph's `custom` stream; `values` gives the
         final state, whose last message is the coordinator's summary.
+
+        With a checkpointer and `thread_id`, an interrupted run resumes from its
+        last checkpoint: input `None` tells LangGraph to continue, not restart.
         """
-        yield RunStarted(goal=goal)
+        config: RunnableConfig = {"configurable": {"thread_id": thread_id}} if thread_id else {}
+        saved = await self._coordinator.aget_state(config) if thread_id else None
+        if saved is not None and saved.next:
+            yield RunResumed(from_step=", ".join(saved.next))
+            inputs: Any = None
+        else:
+            yield RunStarted(goal=goal)
+            inputs = {"messages": [{"role": "user", "content": goal}]}
+
         final: Any = {}
         async for part in self._coordinator.astream(
-            {"messages": [{"role": "user", "content": goal}]},
-            stream_mode=["custom", "values"],
-            version="v2",
+            inputs, config, stream_mode=["custom", "values"], version="v2"
         ):
             if part["type"] == "custom":
                 yield team_event.validate_python(part["data"])
@@ -146,7 +170,11 @@ def _pool_tool(skills: tuple[str, ...], names: list[str], agents: dict[str, Any]
     )
 
 
-def build_team(employees: list[EmployeeSpec], model: ModelFactory) -> _LangGraphTeam:
+def build_team(
+    employees: list[EmployeeSpec],
+    model: ModelFactory,
+    checkpointer: BaseCheckpointSaver[Any] | None = None,
+) -> _LangGraphTeam:
     if not employees:
         raise ValueError("a team needs at least one employee")
-    return _LangGraphTeam(employees, model)
+    return _LangGraphTeam(employees, model, checkpointer)

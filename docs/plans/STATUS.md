@@ -16,7 +16,10 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [x] Spike `checkpoint-interrupt`: pause in one process, resume in another via `PostgresSaver`; `response_schema` validates admin answers. Findings: [docs/frameworks/langgraph.md](../frameworks/langgraph.md).
 - [x] M0: FastAPI + `/health` in compose; Alembic (migrate job before API); tenants + employees; RLS with non-owner app role (ADR-0005), 7 isolation tests.
 - [ ] **M0 remaining**: auth (ADR-0003, revisit Zitadel weight), task queue ADR-0004, observability ADR-0006.
-- [ ] Then M1: skill registry, team builder from DB rows (ADR-0007), events persisted + streamed over WebSocket, fake model.
+- [x] M1: skill catalog + employees API; team builder (ADR-0007) with rule-based fake; runs + events (RLS); WebSocket via Redis Streams; Taskiq worker (ADR-0004); resume from LangGraph Postgres checkpoint (checkpoint tables under RLS by thread_id prefix). Crash demo verified: resumed run re-ran only the summary step.
+- [ ] **Open: taskiq-redis reclaim bug** (ADR-0004 update): a dead worker's run is reclaimed only when a new message arrives. Decide fix: (a) subclass overriding `listen()` + upstream issue/PR, (b) Taskiq scheduler heartbeat task, (c) domain watchdog for stale `running` runs.
+- [ ] Known gap: a segment that times out (taskiq `timeout`) is cancelled with `CancelledError` (not caught) → run stays `running`. Handle with the watchdog/fix above.
+- [ ] Next: auth (ADR-0003), then M2 sandbox + tools.
 
 Moved out of M-1: Langfuse → M0/M1, MCP + Playwright → M2, Agent Server → ADR from docs.
 

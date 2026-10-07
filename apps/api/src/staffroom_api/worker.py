@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from taskiq import AsyncBroker, Context, InMemoryBroker, TaskiqDepends, TaskiqEvents, TaskiqState
 from taskiq_redis import RedisStreamBroker
 
+from staffroom_api.agents.checkpoints import run_checkpointer
 from staffroom_api.agents.models import chat_model
 from staffroom_api.agents.team import EmployeeSpec, build_team
 from staffroom_api.db.models import Employee, Run
@@ -40,7 +41,7 @@ broker = _make_broker(settings)
 async def _startup(state: TaskiqState) -> None:
     state.db = create_async_engine(settings.database_url, pool_pre_ping=True)
     state.redis = Redis.from_url(settings.redis_url, socket_timeout=5)
-    state.model = settings.staffroom_model
+    state.settings = settings
 
 
 @broker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
@@ -51,9 +52,9 @@ async def _shutdown(state: TaskiqState) -> None:
 
 @broker.task(task_name="run_segment", timeout=settings.run_segment_timeout_seconds)
 async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepends()) -> None:
-    """Execute one segment of a run (until it finishes; later: or pauses for the admin)."""
+    """Execute one segment of a run: until it finishes (later: or pauses for the admin)."""
     tid, rid = uuid.UUID(tenant_id), uuid.UUID(run_id)
-    db, redis, model = context.state.db, context.state.redis, context.state.model
+    db, redis, s = context.state.db, context.state.redis, context.state.settings
 
     async with tenant_transaction(db, tid) as conn:
         session = AsyncSession(bind=conn)
@@ -66,5 +67,10 @@ async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepe
         ]
         goal = run.goal
 
-    team = build_team(employees, model=partial(chat_model, model))
-    await execute_run(db, redis, tid, rid, team, goal)
+    # Checkpoints make the run resumable: if this worker dies, the redelivered
+    # message lands on another worker, which continues from the last checkpoint.
+    async with run_checkpointer(s, tid) as checkpointer:
+        team = build_team(
+            employees, model=partial(chat_model, s.staffroom_model), checkpointer=checkpointer
+        )
+        await execute_run(db, redis, tid, rid, team, goal)
