@@ -1,0 +1,29 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from staffroom_api.routes import health
+from staffroom_api.settings import Settings
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or Settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Shared clients live for the app's lifetime; routes read them from app.state.
+        app.state.db = create_async_engine(settings.database_url, pool_pre_ping=True)
+        app.state.redis = Redis.from_url(settings.redis_url, socket_timeout=2)
+        yield
+        await app.state.redis.aclose()
+        await app.state.db.dispose()
+
+    app = FastAPI(title="Staffroom API", lifespan=lifespan)
+    app.include_router(health.router)
+    return app
+
+
+app = create_app()

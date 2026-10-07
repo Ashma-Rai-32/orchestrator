@@ -1,0 +1,11 @@
+**/.venv
+**/__pycache__
+**/node_modules
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+.git
+.env
+spikes
+docs
+experiments

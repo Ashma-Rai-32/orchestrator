@@ -1,8 +1,8 @@
 # Virtual uv workspace root (see docs/adr/0002). Holds shared dev tooling only.
-# apps/api and packages/schemas join `members` when they are created in M0.
+# packages/schemas joins `members` when it is created.
 
 [tool.uv.workspace]
-members = []
+members = ["apps/api"]
 
 [dependency-groups]
 dev = [
@@ -32,6 +32,9 @@ select = [
     "ASYNC",    # async pitfalls
     "RUF",
 ]
+
+[tool.ruff.lint.isort]
+known-first-party = ["staffroom_api"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]  # assert is fine in tests

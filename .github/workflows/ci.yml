@@ -66,5 +66,36 @@ jobs:
             echo "::endgroup::"
           done
 
-  # test job (pytest with Postgres/Redis service containers) is added in M0
-  # together with the first Python code.
+  test:
+    name: API tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: staffroom
+          POSTGRES_PASSWORD: staffroom
+          POSTGRES_DB: staffroom
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U staffroom" --health-interval 3s --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest apps/api
+
+  api-image:
+    name: API image builds and is healthy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose up -d --build --wait api
+      - run: curl -fsS http://localhost:8000/health

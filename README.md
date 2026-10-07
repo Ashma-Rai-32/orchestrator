@@ -60,8 +60,9 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Area | Status | Notes |
 |---|---|---|
 | Repo, CI, compose (Postgres, Redis, Langfuse) | Real | CI runs lint/format/secret scan only; tests arrive with M0 code |
-| Framework spikes (M-1) | Planned | |
-| FastAPI, Alembic, tenants + RLS (M0) | Planned | |
+| Framework spikes (M-1) | Real | [docs/frameworks/](docs/frameworks/) |
+| FastAPI app + `/health` in compose (M0) | Real | Checks Postgres and Redis; tested in CI |
+| Alembic, tenants + RLS (M0) | Planned | |
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox and tools (M2) | Planned | |
 | Office UI (M3) | Planned | |
@@ -80,13 +81,15 @@ Prerequisites: Docker, [uv](https://docs.astral.sh/uv/getting-started/installati
 git clone https://github.com/Ashma-Rai-32/orchestrator.git staffroom && cd staffroom
 cp .env.example .env
 uv sync
-docker compose up -d                              # Postgres + Redis
+docker compose up -d --build --wait               # API + Postgres + Redis
+curl http://localhost:8000/health                 # {"status":"ok",...}; API docs at /docs
 docker compose --profile observability up -d      # optional: Langfuse at http://localhost:3000
+uv run pytest apps/api                            # tests (need Postgres + Redis running)
 ```
 
 Langfuse login with the dev defaults from `.env.example`: `admin@staffroom.local` / `staffroom-dev`.
 
-The API and office UI are not built yet. This section grows with each milestone.
+The office UI is not built yet. This section grows with each milestone.
 
 ## Stack
 
