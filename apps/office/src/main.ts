@@ -1,16 +1,19 @@
 import Phaser from 'phaser'
 import './style.css'
-import { api } from './api.ts'
+import { api, type RunEvent } from './api.ts'
 import { signIn, signOut } from './auth.ts'
 import { OfficeScene } from './scenes/OfficeScene.ts'
+
+const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector)!
 
 async function start(): Promise<void> {
   await signIn()
   const [me, employees] = await Promise.all([api.me(), api.employees()])
 
-  document.querySelector('#company')!.textContent = me.tenant_name
-  document.querySelector('#sign-out')!.addEventListener('click', () => void signOut())
+  $('#company').textContent = me.tenant_name
+  $('#sign-out').addEventListener('click', () => void signOut())
 
+  const scene = new OfficeScene({ employees })
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'office',
@@ -22,10 +25,38 @@ async function start(): Promise<void> {
     antialias: true,
     roundPixels: true,
     backgroundColor: '#1d2029',
-    scene: new OfficeScene({ employees }),
+    scene,
+  })
+  await scene.loaded
+
+  $<HTMLFormElement>('#goal-form').addEventListener('submit', (submit) => {
+    submit.preventDefault()
+    const input = $<HTMLInputElement>('#goal')
+    void runGoal(scene, input.value.trim()).catch((error: unknown) => status(`Run failed: ${String(error)}`))
+    input.value = ''
   })
 }
 
+async function runGoal(scene: OfficeScene, goal: string): Promise<void> {
+  const button = $<HTMLButtonElement>('#goal-form button')
+  button.disabled = true
+  try {
+    const run = await api.startRun(goal)
+    status(`Working on "${goal}"…`)
+    await api.followRun(run.id, (event: RunEvent) => {
+      scene.show(event)
+      if (event.type === 'run_finished') status(event.summary)
+      if (event.type === 'run_failed') status(`The run failed (${event.error}).`)
+    })
+  } finally {
+    button.disabled = false
+  }
+}
+
+function status(text: string): void {
+  $('#status').textContent = text
+}
+
 start().catch((error: unknown) => {
-  document.querySelector('#office')!.textContent = `Could not open the office: ${String(error)}`
+  $('#office').textContent = `Could not open the office: ${String(error)}`
 })

@@ -41,3 +41,27 @@ button {
 #office canvas {
   display: block;
 }
+
+#goal-form {
+  display: flex;
+  gap: 8px;
+}
+
+#goal {
+  flex: 1;
+  font: inherit;
+  color: inherit;
+  background: #2c313d;
+  border: 1px solid #454c5a;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+#status {
+  margin: 0;
+  max-width: 960px;
+  max-height: 6em; /* long summaries scroll instead of pushing the office off screen */
+  overflow-y: auto;
+  color: #9aa3b5;
+  white-space: pre-wrap;
+}

@@ -1,24 +1,24 @@
 import Phaser from 'phaser'
-import type { Employee } from '../api.ts'
+import type { Employee, RunEvent } from '../api.ts'
+import { LABEL, Person } from './Person.ts'
 
 /** A named point from the Tiled map's "spots" object layer (desk-1..n, door, huddle). */
 type Spot = { name: string; type: string; x: number; y: number }
 
-const LABEL: Phaser.Types.GameObjects.Text.TextStyle = {
-  fontFamily: 'monospace',
-  fontSize: '8px',
-  color: '#ffffff',
-  stroke: '#1d2029',
-  strokeThickness: 2,
-}
-
 const TINTS = [0xff8a65, 0xffd54f, 0x81c784, 0x64b5f6, 0xba68c8, 0x4dd0e1, 0xf06292, 0xaed581]
+const COORDINATOR_TINT = 0xe0e0e0
 
 export type OfficeData = { employees: Employee[] }
 
 export class OfficeScene extends Phaser.Scene {
   // Not `data`: Phaser.Scene already has a `data` (its DataManager).
   private readonly office: OfficeData
+  private readonly people = new Map<string, Person>()
+  private coordinator?: Person
+  private huddle = { x: 0, y: 0 }
+  private ready?: () => void
+  /** Resolves once create() has run, so events never arrive before the map. */
+  readonly loaded = new Promise<void>((resolve) => (this.ready = resolve))
 
   constructor(office: OfficeData) {
     super('office')
@@ -51,26 +51,60 @@ export class OfficeScene extends Phaser.Scene {
     })
 
     const all = spots(map)
+    const huddle = all.find((s) => s.name === 'huddle')
+    if (!huddle) throw new Error('spot "huddle" missing from office.tmj')
+    this.huddle = huddle
+    // The platform's coordinator: plans and assigns, never hired by the tenant.
+    this.coordinator = new Person(this, 'Coordinator', huddle.x, huddle.y - 8, COORDINATOR_TINT)
+
     const desks = all.filter((s) => s.type === 'desk')
     const seated = this.office.employees.slice(0, desks.length) // hire order = desk order
-    seated.forEach((employee, i) => this.seat(employee.name, desks[i]))
+    seated.forEach((e, i) => {
+      this.people.set(e.name, new Person(this, e.name, desks[i].x, desks[i].y, tintFor(e.name)))
+    })
 
     const standing = this.office.employees.length - seated.length
-    const huddle = all.find((s) => s.name === 'huddle')
-    if (standing > 0 && huddle) {
-      this.add.text(huddle.x, huddle.y, `+${standing} without a desk`, LABEL).setOrigin(0.5).setResolution(4)
-    }
-    if (this.office.employees.length === 0 && huddle) {
-      this.add.text(huddle.x, huddle.y, 'No one hired yet', LABEL).setOrigin(0.5).setResolution(4)
+    if (standing > 0) this.note(`+${standing} without a desk`)
+    if (this.office.employees.length === 0) this.note('No one hired yet')
+    this.ready?.()
+  }
+
+  /** Turn one run event into what people in the office do. */
+  show(event: RunEvent): void {
+    const boss = this.coordinator
+    switch (event.type) {
+      case 'run_started':
+        boss?.say(`Planning: ${event.goal}`)
+        break
+      case 'run_resumed':
+        boss?.say('Picking up where we left off')
+        break
+      case 'task_assigned': {
+        boss?.say(`${event.employee}, please take this one`)
+        const person = this.people.get(event.employee)
+        // Walk to the huddle for the brief, then back to the desk to work on it.
+        const briefing = { x: this.huddle.x + Phaser.Math.Between(-24, 24), y: this.huddle.y + 12 }
+        person?.say('')
+        person?.walk([briefing], () => {
+          person.say(`Working on: ${event.task}`)
+          person.goHome()
+        })
+        break
+      }
+      case 'task_finished':
+        this.people.get(event.employee)?.say('✓ Done')
+        break
+      case 'run_finished':
+        boss?.say('All done!')
+        break
+      case 'run_failed':
+        boss?.say(`Something went wrong (${event.error})`)
+        break
     }
   }
 
-  private seat(name: string, desk: Spot): void {
-    this.add.sprite(desk.x, desk.y, 'character', 0).setTint(tintFor(name))
-    this.add
-      .text(desk.x, desk.y + 9, name, LABEL)
-      .setOrigin(0.5, 0)
-      .setResolution(4) // render text at 4x so it stays sharp under the 2x zoom
+  private note(text: string): void {
+    this.add.text(this.huddle.x, this.huddle.y + 24, text, LABEL).setOrigin(0.5).setResolution(4)
   }
 }
 
