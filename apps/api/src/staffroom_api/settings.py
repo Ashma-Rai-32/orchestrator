@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     redis_host: str = "localhost"
     redis_port: int = 6379
 
+    # "fake" (deterministic, no key) or "<provider>:<pinned model id>" for init_chat_model.
+    staffroom_model: str = "fake"
+
     def _pg_url(self, user: str, password: SecretStr) -> str:
         return (
             f"postgresql+asyncpg://{user}:{password.get_secret_value()}"

@@ -67,5 +67,17 @@ def test_unknown_tenant_sees_nothing_and_cannot_hire(client: TestClient) -> None
         client.post("/employees", json={"name": "Spy", "skills": ["react"]}, headers=stranger)
 
 
+def test_run_goal_with_hired_team(client: TestClient) -> None:
+    acme = new_tenant(client, "Acme")
+    assert client.post("/goals", json={"goal": "Build a site"}, headers=acme).status_code == 409
+
+    for name, skills in [("Robin", ["react"]), ("Sam", ["react"]), ("Ada", ["nodejs"])]:
+        client.post("/employees", json={"name": name, "skills": skills}, headers=acme)
+    result = client.post("/goals", json={"goal": "Build a site"}, headers=acme).json()
+
+    assert {a["employee"] for a in result["assignments"]} == {"Robin", "Ada"}
+    assert result["summary"].startswith("All done.")
+
+
 def test_missing_tenant_header_is_rejected(client: TestClient) -> None:
     assert client.get("/employees").status_code == 422

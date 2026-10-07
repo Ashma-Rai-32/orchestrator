@@ -64,6 +64,7 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | FastAPI app + `/health` in compose (M0) | Real | Checks Postgres and Redis; tested in CI |
 | Alembic migrations, tenants + employees with RLS (M0) | Real | Isolation proven by tests against real Postgres ([ADR-0005](docs/adr/0005-tenant-isolation-with-postgres-rls.md)) |
 | Skill catalog, tenants, hire/list employees API (M1) | Real | Tested over HTTP against Postgres with RLS |
+| Team builder + `POST /goals` (M1) | Real, **fake model** | Coordinator + skill pools (ADR-0007); runs synchronously in the request; no real LLM yet |
 | Auth (M0) | **Stubbed** | Tenant comes from an `X-Tenant-ID` header; do not expose publicly |
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox and tools (M2) | Planned | |
