@@ -9,7 +9,7 @@ _Last updated: 2026-10-07_
 ## Next step
 
 - [x] Increment 1: model from config (`init_chat_model`) + scripted fake model (`GenericFakeChatModel`); same calling code.
-- [ ] Increment 2: tool calling (`bind_tools`). Gotcha confirmed in source: `GenericFakeChatModel` does not implement `bind_tools` → find the framework-provided way before writing a subclass.
+- [x] Increment 2: tool calling. `@tool` → schema; scripted `tool_calls`; `tool.invoke(tool_call)` returns a linked `ToolMessage`. No fake in langchain-core or langchain-tests implements `bind_tools` → 5-line `FakeToolCallingModel` subclass (only custom code). Open gotcha: a tool returning `list[str]` becomes list `ToolMessage.content`; check how real providers treat it.
 - [ ] Increment 3: structured output (`with_structured_output`).
 - [ ] Increment 4: resilience (`with_fallbacks`, `InMemoryRateLimiter`, retries).
 - [ ] Increment 5: `test_spike.py` + `docs/frameworks/langchain-models.md`.
