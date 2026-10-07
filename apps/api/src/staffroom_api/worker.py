@@ -56,8 +56,16 @@ async def _shutdown(state: TaskiqState) -> None:
 
 
 @broker.task(task_name="run_segment", timeout=settings.run_segment_timeout_seconds)
-async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepends()) -> None:
-    """Execute one segment of a run: until it finishes (later: or pauses for the admin)."""
+async def run_segment(
+    tenant_id: str,
+    run_id: str,
+    answers: dict[str, str] | None = None,
+    context: Context = TaskiqDepends(),
+) -> None:
+    """Execute one segment of a run: until it finishes or pauses for the admin.
+
+    `answers` ({question_id: answer}) resumes a run that was waiting for the admin.
+    """
     tid, rid = uuid.UUID(tenant_id), uuid.UUID(run_id)
     db, redis, s = context.state.db, context.state.redis, context.state.settings
 
@@ -90,7 +98,7 @@ async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepe
                 sandbox=sandbox,
                 toolsets=toolsets,
             )
-            await execute_run(db, redis, tid, rid, team, goal)
+            await execute_run(db, redis, tid, rid, team, goal, answers)
     except Exception as exc:
         # Setup failed (sandbox, browser, model config...): fail visibly. Found when a
         # misconfigured fallback model left runs stuck in `queued` forever.

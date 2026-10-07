@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from taskiq import InMemoryBroker
 
 from staffroom_api.auth import TokenVerifier
-from staffroom_api.routes import catalog, employees, goals, health, tenants
+from staffroom_api.routes import catalog, employees, goals, health, inbox, tenants
 from staffroom_api.settings import Settings
 from staffroom_api.worker import broker
 
@@ -39,7 +39,7 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
         allow_headers=["Authorization", "Content-Type"],
         allow_credentials=False,  # bearer tokens, no cookies
     )
-    for module in (health, catalog, tenants, employees, goals):
+    for module in (health, catalog, tenants, employees, goals, inbox):
         app.include_router(module.router)
     return app
 

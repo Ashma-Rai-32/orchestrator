@@ -12,3 +12,15 @@ from pytest_alembic.tests import (  # noqa: F401  (re-exported so pytest collect
     test_up_down_consistency,
     test_upgrade,
 )
+from sqlalchemy import Index, MetaData, Table
+
+from staffroom_api.db.migration_filters import include_object
+
+
+def test_autogenerate_never_touches_the_checkpointer_tables() -> None:
+    """Live finding: autogenerate proposed dropping LangGraph's tables (all run state)."""
+    md = MetaData()
+    checkpoints = Table("checkpoints", md)
+    assert include_object(checkpoints, "checkpoints", "table", True, None) is False
+    assert include_object(Index("ix", _table=checkpoints), "ix", "index", True, None) is False
+    assert include_object(Table("runs", md), "runs", "table", False, None) is True
