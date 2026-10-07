@@ -90,6 +90,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      - run: docker build -t staffroom-sandbox:dev sandbox/  # for sandbox backend tests
       - run: uv run pytest apps/api
 
   api-image:

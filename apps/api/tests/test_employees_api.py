@@ -1,6 +1,5 @@
 """Hiring employees through the HTTP API, against real Postgres with RLS."""
 
-
 from fastapi.testclient import TestClient
 
 from tests.helpers import new_tenant

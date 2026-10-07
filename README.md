@@ -72,7 +72,8 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Identity provider: Keycloak with organizations (M0) | Real | Realm as code ([ADR-0003](docs/adr/0003-auth-keycloak.md)); demo founders for Acme and Globex |
 | API token verification | Real | PyJWT against Keycloak's JWKS; tenant = the token's organization; WebSocket token via subprotocol (never in URLs or logs) |
 | Agent core: skills, team builder, events (M1) | Planned | |
-| Sandbox and tools (M2) | Planned | |
+| Sandbox backend: hardened Docker (M2) | Real, **not wired to agents yet** | deepagents backend protocol ([ADR-0006](docs/adr/0006-sandbox-deepagents-backends.md)); dev/CI only, E2B planned for production |
+| Agent tools in the sandbox (M2) | Planned | deepagents `FilesystemMiddleware` |
 | Office UI (M3) | Planned | |
 | Real model end-to-end run (M4) | Planned | |
 | Durability across restarts / logout (M5) | Planned | |
