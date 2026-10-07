@@ -14,6 +14,8 @@ from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from deepagents.backends.protocol import SandboxBackendProtocol
+from deepagents.middleware.filesystem import FilesystemMiddleware
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain_core.language_models import BaseChatModel
@@ -74,8 +76,9 @@ class _LangGraphTeam:
         employees: list[EmployeeSpec],
         model: ModelFactory,
         checkpointer: BaseCheckpointSaver[Any] | None,
+        sandbox: SandboxBackendProtocol | None,
     ) -> None:
-        agents = {e.name: self._employee_agent(e, model()) for e in employees}
+        agents = {e.name: self._employee_agent(e, model(), sandbox) for e in employees}
 
         pools: dict[tuple[str, ...], list[str]] = defaultdict(list)
         for e in employees:
@@ -93,12 +96,19 @@ class _LangGraphTeam:
         )
 
     @staticmethod
-    def _employee_agent(e: EmployeeSpec, model: BaseChatModel) -> Any:
+    def _employee_agent(
+        e: EmployeeSpec, model: BaseChatModel, sandbox: SandboxBackendProtocol | None
+    ) -> Any:
+        middleware: list[Any] = [ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS_PER_RUN)]
+        if sandbox is not None:
+            # deepagents: ls/read_file/write_file/edit_file/glob/grep/execute on the run's
+            # sandbox. All employees of a run share one workspace (they build one site).
+            middleware.append(FilesystemMiddleware(backend=sandbox))
         return create_agent(
             model,
-            tools=[],  # M2: resolved from merge_skills(...).tools
+            tools=[],  # skill-specific tools: later, resolved from merge_skills(...).tools
             system_prompt=merge_skills(e.skills).system_prompt,
-            middleware=[ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS_PER_RUN)],
+            middleware=middleware,
             name=e.name,
             checkpointer=False,  # don't inherit the coordinator's; a task is redone as a whole
         )
@@ -174,7 +184,8 @@ def build_team(
     employees: list[EmployeeSpec],
     model: ModelFactory,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
+    sandbox: SandboxBackendProtocol | None = None,
 ) -> _LangGraphTeam:
     if not employees:
         raise ValueError("a team needs at least one employee")
-    return _LangGraphTeam(employees, model, checkpointer)
+    return _LangGraphTeam(employees, model, checkpointer, sandbox)

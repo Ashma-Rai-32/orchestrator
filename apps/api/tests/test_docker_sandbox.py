@@ -9,6 +9,8 @@ from collections.abc import Iterator
 import docker
 import pytest
 
+from staffroom_api.agents.models import chat_model
+from staffroom_api.agents.team import EmployeeSpec, build_team
 from staffroom_api.sandbox.docker_backend import DockerSandbox
 
 IMAGE = "staffroom-sandbox:dev"
@@ -63,3 +65,23 @@ def test_workspace_survives_container_loss(run_id: uuid.UUID) -> None:
 
     second = DockerSandbox(tenant, run_id, image=IMAGE)
     assert "keep me" in str(second.read("/workspace/notes.md"))
+
+
+@pytest.mark.anyio
+async def test_employees_use_the_sandbox_during_a_run(sandbox: DockerSandbox) -> None:
+    team = build_team(
+        [EmployeeSpec("Robin", ["react"]), EmployeeSpec("Ada", ["nodejs"])],
+        model=lambda: chat_model("fake"),
+        sandbox=sandbox,
+    )
+    result = await team.run("Build a site")
+
+    # Each employee wrote a note via write_file, then ran node via execute.
+    notes = sandbox.execute("ls /workspace/notes").output.split()
+    assert len(notes) == 2
+    assert all("workspace/notes:" in a.result for a in result.assignments)
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"

@@ -4,12 +4,14 @@ langchain-core's fakes replay a fixed script and none implements `bind_tools`
 (see docs/frameworks/langchain-models.md). Teams are built from database rows,
 so tool names are not known in advance; this fake reacts to whatever is bound:
 
-- tools bound, new request  -> call every bound tool once
-- tool results came back    -> summarise them
-- no tools                  -> report the request as done
+- coordinator (delegation tools bound) -> call every bound tool once, then summarise
+- employee with sandbox tools          -> write_file, then execute, then report
+  (sequential, as a real model would: a command must not race the file it reads)
+- no tools                             -> report the request as done
 """
 
 import asyncio
+import hashlib
 from collections.abc import Sequence
 from typing import Any
 
@@ -18,6 +20,12 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
+
+SANDBOX_TOOLS = {"write_file", "execute"}
+LIST_WORKSPACE = (
+    "node -e \"const fs=require('fs');"
+    "console.log('workspace/notes:', fs.readdirSync('/workspace/notes').join(', '))\""
+)
 
 
 class RuleBasedFakeModel(BaseChatModel):
@@ -53,15 +61,29 @@ class RuleBasedFakeModel(BaseChatModel):
 
     def _reply(self, messages: list[BaseMessage]) -> AIMessage:
         request = next(str(m.content) for m in reversed(messages) if isinstance(m, HumanMessage))
-        if isinstance(messages[-1], ToolMessage):
-            results = [str(m.content) for m in messages if isinstance(m, ToolMessage)]
+        results = [str(m.content) for m in messages if isinstance(m, ToolMessage)]
+        if set(self.tool_names) >= SANDBOX_TOOLS:
+            return self._sandbox_step(request, results)
+        if results:
             return AIMessage(content="All done. " + " | ".join(results))
         if self.tool_names:
-            return AIMessage(
-                content="",
-                tool_calls=[
-                    {"name": name, "args": {"task": f"{request} [{name}]"}, "id": f"call_{i}"}
-                    for i, name in enumerate(self.tool_names)
-                ],
-            )
+            return _calls([(name, {"task": f"{request} [{name}]"}) for name in self.tool_names])
         return AIMessage(content=f"Done: {request}")
+
+    @staticmethod
+    def _sandbox_step(request: str, results: list[str]) -> AIMessage:
+        if not results:
+            note = f"/workspace/notes/{hashlib.sha256(request.encode()).hexdigest()[:8]}.md"
+            return _calls([("write_file", {"file_path": note, "content": f"# Task\n{request}\n"})])
+        if len(results) == 1:
+            return _calls([("execute", {"command": LIST_WORKSPACE})])
+        return AIMessage(content=f"Done: {request}. {results[-1].strip()}")
+
+
+def _calls(calls: list[tuple[str, dict[str, Any]]]) -> AIMessage:
+    return AIMessage(
+        content="",
+        tool_calls=[
+            {"name": name, "args": args, "id": f"call_{i}"} for i, (name, args) in enumerate(calls)
+        ],
+    )

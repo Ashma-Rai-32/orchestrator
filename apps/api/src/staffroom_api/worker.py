@@ -19,6 +19,7 @@ from staffroom_api.broker import ReclaimingRedisStreamBroker
 from staffroom_api.db.models import Employee, Run
 from staffroom_api.db.tenancy import tenant_transaction
 from staffroom_api.runs import execute_run
+from staffroom_api.sandbox import run_sandbox
 from staffroom_api.settings import Settings
 
 settings = Settings()
@@ -69,8 +70,11 @@ async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepe
 
     # Checkpoints make the run resumable: if this worker dies, the redelivered
     # message lands on another worker, which continues from the last checkpoint.
-    async with run_checkpointer(s, tid) as checkpointer:
+    async with run_checkpointer(s, tid) as checkpointer, run_sandbox(s, tid, rid) as sandbox:
         team = build_team(
-            employees, model=partial(chat_model, s.staffroom_model), checkpointer=checkpointer
+            employees,
+            model=partial(chat_model, s.staffroom_model),
+            checkpointer=checkpointer,
+            sandbox=sandbox,
         )
         await execute_run(db, redis, tid, rid, team, goal)

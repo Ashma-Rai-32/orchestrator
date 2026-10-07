@@ -7,6 +7,7 @@ maps deepagents' four primitives onto the Docker API. Production uses E2B.
 import io
 import shlex
 import tarfile
+import time
 import uuid
 from pathlib import PurePosixPath
 from typing import Any
@@ -101,6 +102,7 @@ class DockerSandbox(BaseSandbox):
             with tarfile.open(fileobj=buffer, mode="w") as tar:
                 info = tarfile.TarInfo(target.name)
                 info.size, info.uid, info.gid, info.mode = len(content), 1000, 1000, 0o644
+                info.mtime = int(time.time())  # tar defaults to 1970, confusing build tools
                 tar.addfile(info, io.BytesIO(content))
             parent = str(target.parent)
             self.execute(f"mkdir -p {shlex.quote(parent)}")
