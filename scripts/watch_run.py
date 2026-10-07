@@ -6,6 +6,7 @@
 
     uv run scripts/watch_run.py "Build me an LLM wrapper website"
     uv run scripts/watch_run.py --as founder@globex.test "Build a landing page"
+    uv run scripts/watch_run.py --as founder@initech.test --team duo "..."   # small team, local models
 """
 
 import argparse
@@ -18,12 +19,16 @@ import websockets
 
 API = "http://localhost:8000"
 TOKEN_URL = "http://localhost:8080/realms/staffroom/protocol/openid-connect/token"
-TEAM = [
-    ("Pixel 1", ["react", "css"]),
-    ("Pixel 2", ["react", "css"]),
-    ("Ada", ["nodejs", "ai-integration"]),
-    ("Tess", ["testing"]),  # checks the built site in a real browser
-]
+TEAMS = {
+    "full": [
+        ("Pixel 1", ["react", "css"]),
+        ("Pixel 2", ["react", "css"]),
+        ("Ada", ["nodejs", "ai-integration"]),
+        ("Tess", ["testing"]),  # checks the built site in a real browser
+    ],
+    # For slow local models: one builder + one tester (fewer, shorter model calls).
+    "duo": [("Pixel 1", ["react", "css"]), ("Tess", ["testing"])],
+}
 
 
 async def sign_in(http: httpx.AsyncClient, username: str) -> str:
@@ -36,14 +41,14 @@ async def sign_in(http: httpx.AsyncClient, username: str) -> str:
     return str(response.json()["access_token"])
 
 
-async def main(goal: str, username: str) -> None:
+async def main(goal: str, username: str, team: str) -> None:
     async with httpx.AsyncClient(base_url=API) as http:
         token = await sign_in(http, username)
         auth = {"Authorization": f"Bearer {token}"}
         me = (await http.get("/me", headers=auth)).json()
         print(f"signed in as {username}, tenant {me['tenant_name']} ({me['tenant_id']})")
         hired = {e["name"] for e in (await http.get("/employees", headers=auth)).json()}
-        for name, skills in TEAM:
+        for name, skills in TEAMS[team]:
             if name not in hired:
                 await http.post("/employees", json={"name": name, "skills": skills}, headers=auth)
         run = (await http.post("/goals", json={"goal": goal}, headers=auth)).json()
@@ -63,5 +68,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("goal", nargs="?", default="Build me an LLM wrapper website")
     parser.add_argument("--as", dest="username", default="founder@acme.test")
+    parser.add_argument("--team", choices=TEAMS, default="full", help="who to hire if missing")
     args = parser.parse_args()
-    asyncio.run(main(args.goal, args.username))
+    asyncio.run(main(args.goal, args.username, args.team))

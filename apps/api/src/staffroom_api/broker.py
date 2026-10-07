@@ -1,20 +1,26 @@
-"""Workaround for a taskiq-redis bug; delete when upstream is fixed.
+"""Workarounds for taskiq-redis `RedisStreamBroker.listen`; delete when upstream is fixed.
 
 taskiq-redis 1.2.4 (`RedisStreamBroker.listen`) does `if not fetched: continue`
 before its XAUTOCLAIM block, so on an idle queue a dead worker's message is never
 reclaimed; only the arrival of a new message triggers it (ADR-0004, update).
 
-This subclass runs the same reclaim on every loop iteration. The logic is
+This subclass runs the same reclaim on every loop iteration, and survives a timed-out
+or dropped blocking read instead of crashing the worker process. The logic is
 upstream's, reordered. `tests/test_broker.py::test_upstream_broker_still_has_the_bug`
 fails once upstream fixes it: that is the signal to delete this module.
 """
 
+import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
 from redis.asyncio import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 from taskiq import AckableMessage
 from taskiq_redis import RedisStreamBroker
+
+log = logging.getLogger(__name__)
 
 
 class ReclaimingRedisStreamBroker(RedisStreamBroker):
@@ -22,14 +28,21 @@ class ReclaimingRedisStreamBroker(RedisStreamBroker):
         async with Redis(connection_pool=self.connection_pool) as redis_conn:
             streams: Any = {self.queue_name: ">", **self.additional_streams}  # as upstream
             while True:
-                fetched: Any = await redis_conn.xreadgroup(
-                    self.consumer_group_name,
-                    self.consumer_name,
-                    streams,
-                    block=self.block,
-                    noack=False,
-                    count=self.count,
-                )
+                try:
+                    fetched: Any = await redis_conn.xreadgroup(
+                        self.consumer_group_name,
+                        self.consumer_name,
+                        streams,
+                        block=self.block,
+                        noack=False,
+                        count=self.count,
+                    )
+                except (RedisTimeoutError, RedisConnectionError) as exc:
+                    # Second fix (found with a real local model saturating the CPU): a slow
+                    # blocking read raised, killing the worker process and the run inside
+                    # it. For a poll, a timeout means "no message yet"; keep listening.
+                    log.warning("queue read failed (%s); retrying", type(exc).__name__)
+                    continue
                 for stream, messages in fetched or []:
                     for msg_id, msg in messages:
                         yield self._ackable(stream, msg_id, msg)

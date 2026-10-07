@@ -115,6 +115,21 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "founder@initech.test",
+      "email": "founder@initech.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Ivy",
+      "lastName": "Initech",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "staffroom-dev",
+          "temporary": false
+        }
+      ]
     }
   ],
   "organizations": [
@@ -150,6 +165,24 @@
       "members": [
         {
           "username": "founder@globex.test",
+          "membershipType": "MANAGED"
+        }
+      ]
+    },
+    {
+      "id": "3c8f1a2e-9b7d-4e6f-a5c4-2d1e0f9a8b7c",
+      "name": "Initech",
+      "alias": "initech",
+      "enabled": true,
+      "domains": [
+        {
+          "name": "initech.test",
+          "verified": false
+        }
+      ],
+      "members": [
+        {
+          "username": "founder@initech.test",
           "membershipType": "MANAGED"
         }
       ]

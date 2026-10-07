@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from typing import Any, cast
 
 from redis.asyncio import Redis
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from staffroom_api.agents.events import TeamEvent
 
@@ -46,10 +47,15 @@ async def follow(
     """Yield every event of the run from the beginning, then live, until it ends."""
     key, last_id = stream_key(tenant_id, run_id), b"0-0"
     while True:
-        # Short blocks: the shared client has a 2 s socket timeout.
-        batches = cast(
-            XReadResult, await redis.xread({key: last_id}, block=1000, count=100)
-        )  # redis-py types this loosely
+        # Short blocks: the shared client has a 2 s socket timeout. Real models leave long
+        # gaps between events, and a busy host can push a read past that timeout: for a
+        # poll, a timeout just means "nothing new yet", so poll again.
+        try:
+            batches = cast(
+                XReadResult, await redis.xread({key: last_id}, block=1000, count=100)
+            )  # redis-py types this loosely
+        except RedisTimeoutError:
+            continue
         for _key, entries in batches:
             for entry_id, fields in entries:
                 last_id = entry_id

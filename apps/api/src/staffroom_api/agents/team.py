@@ -39,7 +39,17 @@ from staffroom_api.skills.catalog import merge_skills
 COORDINATOR_PROMPT = (
     "You are the coordinator of a team of AI employees. Split the admin's goal into "
     "concrete tasks and assign each one with the matching tool. Call several tools in "
-    "one turn when tasks are independent. When all results are in, summarise them."
+    "one turn when tasks are independent. "
+    # Real-model finding: a 4B model assigned testing in parallel with building.
+    "Assign testing or review work only after the building tasks have returned. "
+    "When all results are in, summarise them for a non-technical founder."
+)
+# Real-model finding: without this, a model wrote to /bean-there/... on the sandbox's
+# read-only root filesystem, and every write failed.
+WORKSPACE_PROMPT = (
+    "\nThe team's project lives in /workspace (shared with your colleagues). Create and "
+    "edit files only under /workspace, for example /workspace/site/index.html. "
+    "Everything outside /workspace is read-only."
 )
 MAX_MODEL_CALLS_PER_RUN = 20  # runaway guard per agent run
 
@@ -120,7 +130,7 @@ class _LangGraphTeam:
         return create_agent(
             model,
             tools=skill_tools,
-            system_prompt=profile.system_prompt,
+            system_prompt=employee_prompt(profile.system_prompt, sandbox is not None),
             middleware=middleware,
             name=e.name,
             checkpointer=False,  # don't inherit the coordinator's; a task is redone as a whole
@@ -211,6 +221,11 @@ def build_team(
     if not employees:
         raise ValueError("a team needs at least one employee")
     return _LangGraphTeam(employees, model, checkpointer, sandbox, toolsets or {})
+
+
+def employee_prompt(skills_prompt: str, has_sandbox: bool) -> str:
+    """Skill prompt, plus where the shared project lives when there is a workspace."""
+    return skills_prompt + (WORKSPACE_PROMPT if has_sandbox else "")
 
 
 def toolsets_needed(employees: list[EmployeeSpec]) -> set[str]:

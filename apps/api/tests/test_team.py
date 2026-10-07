@@ -4,7 +4,7 @@ import pytest
 from langchain_core.language_models import BaseChatModel
 
 from staffroom_api.agents.models import chat_model
-from staffroom_api.agents.team import EmployeeSpec, TeamResult, build_team
+from staffroom_api.agents.team import EmployeeSpec, TeamResult, build_team, employee_prompt
 
 pytestmark = pytest.mark.anyio
 
@@ -56,3 +56,8 @@ def _pixel(result: TeamResult) -> str:
 def test_empty_team_is_rejected() -> None:
     with pytest.raises(ValueError, match="at least one employee"):
         build_team([], model=fake)
+
+
+def test_employees_with_a_sandbox_are_told_where_the_project_lives() -> None:
+    assert "/workspace" in employee_prompt("You build React UIs.", has_sandbox=True)
+    assert "/workspace" not in employee_prompt("You build React UIs.", has_sandbox=False)

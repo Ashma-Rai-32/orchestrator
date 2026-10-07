@@ -1,5 +1,6 @@
 """WebSocket run stream: replay + live via Redis Streams, Postgres fallback, isolation."""
 
+import json
 import uuid
 from typing import Any
 
@@ -66,3 +67,31 @@ def test_stream_requires_a_token(client: TestClient) -> None:
     with pytest.raises(WebSocketDisconnect) as closed:
         collect(client, run_id, token=None)
     assert closed.value.code == 4401
+
+
+@pytest.mark.anyio
+async def test_follow_survives_redis_read_timeouts() -> None:
+    """Live finding: long gaps between events (real models) made a read time out."""
+    from redis.exceptions import TimeoutError as RedisTimeoutError
+
+    from staffroom_api import event_stream
+
+    finished = json.dumps({"id": 1, "event": {"type": "run_finished", "summary": "ok"}})
+
+    class FlakyRedis:
+        calls = 0
+
+        async def xread(self, *args: Any, **kwargs: Any) -> Any:
+            FlakyRedis.calls += 1
+            if FlakyRedis.calls == 1:
+                raise RedisTimeoutError("Timeout reading from redis:6379")
+            return [(b"key", [(b"1-0", {b"event": finished.encode()})])]
+
+    events = [p async for p in event_stream.follow(FlakyRedis(), uuid.uuid4(), uuid.uuid4())]  # type: ignore[arg-type]
+    assert [e["event"]["type"] for e in events] == ["run_finished"]
+    assert FlakyRedis.calls == 2
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
