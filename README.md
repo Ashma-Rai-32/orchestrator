@@ -75,7 +75,7 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Sandbox: hardened Docker per run (M2) | Real, **dev/CI grade** | deepagents backend protocol ([ADR-0006](docs/adr/0006-sandbox-deepagents-backends.md)); worker reaches Docker only via a socket proxy; E2B planned for production |
 | Agent file + execute tools (M2) | Real | deepagents `FilesystemMiddleware`; one workspace volume per run, kept after the run |
 | Browser tools: Playwright MCP in the sandbox (M2) | Real | Employees with the Testing skill check the built site in Chromium; langchain-mcp-adapters over `docker exec` stdio; curated tool set |
-| Office UI (M3) | Planned | |
+| Office UI (M3) | Real, **static demo team** | Phaser 4 + Vite, Tiled map with desk spots, placeholder pixel art; sign-in + live events next |
 | Real model end-to-end run (M4) | Planned | |
 | Durability across restarts / logout (M5) | Planned | |
 | Deploy with admin approval (M6) | Planned | |
@@ -116,7 +116,7 @@ Keycloak (identity): http://localhost:8080 (admin console: `admin` / `admin`). D
 
 Langfuse login with the dev defaults from `.env.example`: `admin@staffroom.local` / `staffroom-dev`.
 
-The office UI is not built yet. This section grows with each milestone.
+Office UI: `cd apps/office && npm install && npm run dev`, then open http://localhost:5173.
 
 ## Stack
 

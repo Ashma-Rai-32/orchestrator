@@ -50,6 +50,22 @@ jobs:
       - run: docker compose config --quiet
       - run: docker compose --profile observability config --quiet
 
+  office:
+    name: Office UI builds
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/office
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/office/package-lock.json
+      - run: npm ci
+      - run: npm run build  # tsc --strict, then vite build
+
   spikes:
     name: Spike tests
     runs-on: ubuntu-latest
