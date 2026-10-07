@@ -7,7 +7,9 @@ Topology: a coordinator agent whose tools delegate to employees. Employees with
 the same skill set share one tool (a pool), so tool count = distinct skill sets.
 """
 
+import asyncio
 import itertools
+import logging
 import re
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Mapping
@@ -30,11 +32,14 @@ from staffroom_api.agents.events import (
     RunResumed,
     RunStarted,
     TaskAssigned,
+    TaskFailed,
     TaskFinished,
     TeamEvent,
     team_event,
 )
 from staffroom_api.skills.catalog import merge_skills
+
+log = logging.getLogger(__name__)
 
 COORDINATOR_PROMPT = (
     "You are the coordinator of a team of AI employees. Split the admin's goal into "
@@ -181,24 +186,57 @@ class _LangGraphTeam:
             elif isinstance(event, TaskFinished):
                 task = open_tasks.pop(event.employee)
                 result.assignments.append(Assignment(event.employee, task, event.result))
+            elif isinstance(event, TaskFailed):
+                task = open_tasks.pop(event.employee)
+                result.assignments.append(
+                    Assignment(event.employee, task, f"failed: {event.error}")
+                )
             elif isinstance(event, RunFinished):
                 result.summary = event.summary
         return result
 
 
 def _pool_tool(skills: tuple[str, ...], names: list[str], agents: dict[str, Any]) -> BaseTool:
-    """One delegation tool for all employees sharing a skill set."""
-    rotation = itertools.cycle(names)  # TODO(M1): pick an idle employee, not round-robin
+    """One delegation tool for all employees sharing a skill set.
+
+    Each employee works on one task at a time (real-model finding: a model assigned
+    two tasks to a pool of one, and both edited the same file at once). A busy pool
+    queues the task until someone is free. A failed task is reported, not raised:
+    one employee's error must not end the whole run.
+    """
+    busy = {name: asyncio.Lock() for name in names}
+    rotation = itertools.cycle(names)  # fairness among idle employees
+
+    async def claim() -> str:
+        for _ in names:  # first idle employee, in rotation order
+            name = next(rotation)
+            if not busy[name].locked():
+                await busy[name].acquire()  # free lock: returns without yielding
+                return name
+        name = next(rotation)  # everyone is busy: queue behind the next one
+        await busy[name].acquire()
+        return name
 
     async def delegate(task: str, runtime: ToolRuntime) -> str:
-        name = next(rotation)
         emit = runtime.stream_writer  # a plain callable (docstring's `.write` is wrong)
-        emit(TaskAssigned(employee=name, task=task).model_dump())
-        result = await agents[name].ainvoke({"messages": [{"role": "user", "content": task}]})
-        # .text joins content blocks: real models (and MCP tools) may return lists of blocks.
-        answer = str(result["messages"][-1].text)
-        emit(TaskFinished(employee=name, result=answer).model_dump())
-        return f"{name}: {answer}"
+        name = await claim()
+        try:
+            emit(TaskAssigned(employee=name, task=task).model_dump())
+            try:
+                result = await agents[name].ainvoke(
+                    {"messages": [{"role": "user", "content": task}]}
+                )
+            except Exception as exc:
+                log.exception("%s failed a task", name)
+                # Only the error type leaves the worker (messages may contain secrets).
+                emit(TaskFailed(employee=name, error=type(exc).__name__).model_dump())
+                return f"{name} could not finish this task ({type(exc).__name__})."
+            # .text joins content blocks: real models (and MCP tools) may return lists.
+            answer = str(result["messages"][-1].text)
+            emit(TaskFinished(employee=name, result=answer).model_dump())
+            return f"{name}: {answer}"
+        finally:
+            busy[name].release()
 
     slug = re.sub(r"[^a-z0-9_]", "_", "_".join(skills))[:57]
     return StructuredTool.from_function(
@@ -206,7 +244,8 @@ def _pool_tool(skills: tuple[str, ...], names: list[str], agents: dict[str, Any]
         name=f"assign_{slug}",
         description=(
             f"Give one task to an employee skilled in {', '.join(skills)} "
-            f"({len(names)} available). Call several times in one turn to work in parallel."
+            f"({len(names)} available; each works on one task at a time). "
+            "Call several times in one turn to work in parallel."
         ),
     )
 

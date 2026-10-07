@@ -9,6 +9,7 @@ open for the whole segment: `MultiServerMCPClient.get_tools()` would start a new
 server (and a fresh browser) for every single tool call.
 """
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -16,6 +17,9 @@ from contextlib import asynccontextmanager
 from langchain_core.tools import BaseTool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
+from mcp import ClientSession
+
+KEEPALIVE_SECONDS = 60  # well under the socket proxy's 10-minute idle timeout
 
 PLAYWRIGHT_MCP = [
     "playwright-mcp",
@@ -68,4 +72,19 @@ async def browser_tools(container_name: str) -> AsyncIterator[list[BaseTool]]:
     )
     async with client.session("browser") as session:
         tools = await load_mcp_tools(session)
-        yield [t for t in tools if t.name in ALLOWED_TOOLS]
+        keepalive = asyncio.create_task(_keep_alive(session))
+        try:
+            yield [t for t in tools if t.name in ALLOWED_TOOLS]
+        finally:
+            keepalive.cancel()
+
+
+async def _keep_alive(session: ClientSession) -> None:
+    """MCP ping while the browser waits for its turn (often the whole build phase).
+
+    Real-model finding: the Docker socket proxy (HAProxy, `timeout client/server 10m`)
+    closed the idle `docker exec` stream, and the tester's first browser call failed.
+    """
+    while True:
+        await asyncio.sleep(KEEPALIVE_SECONDS)
+        await session.send_ping()

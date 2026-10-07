@@ -32,6 +32,14 @@ class TaskFinished(BaseModel):
     result: str
 
 
+class TaskFailed(BaseModel):
+    """An employee could not finish; the run continues and the coordinator is told."""
+
+    type: Literal["task_failed"] = "task_failed"
+    employee: str
+    error: str  # exception type only: messages may contain secrets
+
+
 class RunFinished(BaseModel):
     type: Literal["run_finished"] = "run_finished"
     summary: str
@@ -43,7 +51,7 @@ class RunFailed(BaseModel):
 
 
 TeamEvent = Annotated[
-    RunStarted | RunResumed | TaskAssigned | TaskFinished | RunFinished | RunFailed,
+    RunStarted | RunResumed | TaskAssigned | TaskFinished | TaskFailed | RunFinished | RunFailed,
     Field(discriminator="type"),
 ]
 team_event = TypeAdapter[TeamEvent](TeamEvent)

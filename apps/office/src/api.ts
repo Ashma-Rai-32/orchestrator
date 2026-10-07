@@ -13,6 +13,7 @@ export type RunEvent =
   | { type: 'run_resumed'; from_step: string }
   | { type: 'task_assigned'; employee: string; task: string }
   | { type: 'task_finished'; employee: string; result: string }
+  | { type: 'task_failed'; employee: string; error: string }
   | { type: 'run_finished'; summary: string }
   | { type: 'run_failed'; error: string }
 

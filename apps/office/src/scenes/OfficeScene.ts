@@ -94,6 +94,9 @@ export class OfficeScene extends Phaser.Scene {
       case 'task_finished':
         this.people.get(event.employee)?.say('✓ Done')
         break
+      case 'task_failed':
+        this.people.get(event.employee)?.say(`✗ Couldn't finish (${event.error})`)
+        break
       case 'run_finished':
         boss?.say('All done!')
         break
