@@ -104,6 +104,28 @@ async def test_cannot_move_own_row_to_another_tenant(app_engine: AsyncEngine) ->
             )
 
 
+def test_every_tenant_table_has_rls(rls_db: dict[str, str]) -> None:
+    """Guard for new tables: anything with a tenant column must be under RLS."""
+    engine = create_engine(rls_db["owner"])
+    with engine.connect() as conn:
+        unprotected = (
+            conn.execute(
+                text("""
+                SELECT c.relname FROM pg_class c
+                JOIN information_schema.columns col
+                  ON col.table_name = c.relname AND col.column_name = 'tenant_id'
+                WHERE col.table_schema = 'public'
+                  AND NOT (c.relrowsecurity AND c.relforcerowsecurity
+                           AND EXISTS (SELECT 1 FROM pg_policies p WHERE p.tablename = c.relname))
+            """)
+            )
+            .scalars()
+            .all()
+        )
+    engine.dispose()
+    assert unprotected == []
+
+
 async def test_app_role_cannot_switch_off_rls(app_engine: AsyncEngine) -> None:
     with pytest.raises(DBAPIError, match="must be owner"):
         async with app_engine.begin() as conn:

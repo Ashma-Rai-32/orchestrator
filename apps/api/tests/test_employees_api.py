@@ -73,10 +73,30 @@ def test_run_goal_with_hired_team(client: TestClient) -> None:
 
     for name, skills in [("Robin", ["react"]), ("Sam", ["react"]), ("Ada", ["nodejs"])]:
         client.post("/employees", json={"name": name, "skills": skills}, headers=acme)
-    result = client.post("/goals", json={"goal": "Build a site"}, headers=acme).json()
+    started = client.post("/goals", json={"goal": "Build a site"}, headers=acme)
+    assert started.status_code == 202
+    assert started.json()["status"] == "queued"
+    run_id = started.json()["id"]
 
-    assert {a["employee"] for a in result["assignments"]} == {"Robin", "Ada"}
-    assert result["summary"].startswith("All done.")
+    # TestClient runs background tasks before returning, so the run is finished here.
+    run = client.get(f"/runs/{run_id}", headers=acme).json()
+    assert run["status"] == "succeeded"
+    assert run["summary"].startswith("All done.")
+
+    events = [e["event"] for e in client.get(f"/runs/{run_id}/events", headers=acme).json()]
+    assert events[0] == {"type": "run_started", "goal": "Build a site"}
+    assert events[-1]["type"] == "run_finished"
+    finished = {e["employee"] for e in events if e["type"] == "task_finished"}
+    assert finished == {"Robin", "Ada"}
+
+
+def test_runs_are_isolated_between_tenants(client: TestClient) -> None:
+    acme, globex = new_tenant(client, "Acme"), new_tenant(client, "Globex")
+    client.post("/employees", json={"name": "Robin", "skills": ["react"]}, headers=acme)
+    run_id = client.post("/goals", json={"goal": "secret plan"}, headers=acme).json()["id"]
+
+    assert client.get(f"/runs/{run_id}", headers=globex).status_code == 404
+    assert client.get(f"/runs/{run_id}/events", headers=globex).json() == []
 
 
 def test_missing_tenant_header_is_rejected(client: TestClient) -> None:
