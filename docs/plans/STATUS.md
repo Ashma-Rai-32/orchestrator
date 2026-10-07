@@ -4,12 +4,15 @@ _Last updated: 2026-10-07_
 
 ## Current milestone
 
-**Scaffold done (uncommitted), M-1 next.**
+**M-1, spike `langchain-models`, working in small increments** (one concept per step, run and shown, then maintainer reviews and commits).
 
 ## Next step
 
-1. Maintainer commits the scaffold (split proposed in the session; see "Scaffold" in [roadmap.md](roadmap.md)).
-2. Start M-1, first spike: `langchain-models` (see [roadmap.md](roadmap.md#m-1-framework-discovery)).
+- [x] Increment 1: model from config (`init_chat_model`) + scripted fake model (`GenericFakeChatModel`); same calling code.
+- [ ] Increment 2: tool calling (`bind_tools`). Gotcha confirmed in source: `GenericFakeChatModel` does not implement `bind_tools` → find the framework-provided way before writing a subclass.
+- [ ] Increment 3: structured output (`with_structured_output`).
+- [ ] Increment 4: resilience (`with_fallbacks`, `InMemoryRateLimiter`, retries).
+- [ ] Increment 5: `test_spike.py` + `docs/frameworks/langchain-models.md`.
 
 ## Answered questions
 

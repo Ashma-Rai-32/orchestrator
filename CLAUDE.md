@@ -7,7 +7,8 @@ Guidance for AI coding agents working in this repo. Humans: see [README.md](READ
 1. Read [docs/plans/STATUS.md](docs/plans/STATUS.md): current step, open questions, decision log.
 2. Read the current milestone in [docs/plans/roadmap.md](docs/plans/roadmap.md).
 3. Check [docs/adr/](docs/adr/) before proposing anything already decided.
-4. After finishing a step, update `STATUS.md` and propose a Conventional Commit message.
+4. Work in **small increments**: one concept per step, run it and show the output, explain what the framework did, then stop for review. The maintainer is learning the frameworks and wants control.
+5. After finishing a step, update `STATUS.md` and propose a Conventional Commit message.
 
 ## The rule
 
