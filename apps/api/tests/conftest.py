@@ -4,10 +4,12 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, text
 from testcontainers.community.postgres import PostgresContainer
 
+from staffroom_api.main import create_app
 from staffroom_api.settings import Settings
 
 ALEMBIC_INI = Path(__file__).parents[1] / "alembic.ini"
@@ -86,3 +88,9 @@ def api_settings(postgres: PostgresContainer, rls_db: dict[str, str]) -> Setting
         app_db_user=APP_ROLE,
         app_db_password=SecretStr(APP_PASSWORD),
     )
+
+
+@pytest.fixture
+def client(api_settings: Settings) -> Iterator[TestClient]:
+    with TestClient(create_app(api_settings)) as c:
+        yield c

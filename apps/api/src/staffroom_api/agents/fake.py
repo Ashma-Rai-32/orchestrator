@@ -9,10 +9,11 @@ so tool names are not known in advance; this fake reacts to whatever is bound:
 - no tools                  -> report the request as done
 """
 
+import asyncio
 from collections.abc import Sequence
 from typing import Any
 
-from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
@@ -21,6 +22,7 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 
 class RuleBasedFakeModel(BaseChatModel):
     tool_names: tuple[str, ...] = ()
+    latency_seconds: float = 0.0  # simulated thinking time, to watch runs unfold
 
     @property
     def _llm_type(self) -> str:
@@ -37,6 +39,16 @@ class RuleBasedFakeModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
+        return ChatResult(generations=[ChatGeneration(message=self._reply(messages))])
+
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        await asyncio.sleep(self.latency_seconds)  # non-blocking, so parallel tasks overlap
         return ChatResult(generations=[ChatGeneration(message=self._reply(messages))])
 
     def _reply(self, messages: list[BaseMessage]) -> AIMessage:

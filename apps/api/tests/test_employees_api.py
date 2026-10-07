@@ -1,26 +1,12 @@
 """Hiring employees through the HTTP API, against real Postgres with RLS."""
 
 import uuid
-from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
-from staffroom_api.main import create_app
-from staffroom_api.settings import Settings
-
-
-@pytest.fixture
-def client(api_settings: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(api_settings)) as c:
-        yield c
-
-
-def new_tenant(client: TestClient, name: str) -> dict[str, str]:
-    response = client.post("/tenants", json={"name": name})
-    assert response.status_code == 201
-    return {"X-Tenant-ID": response.json()["id"]}
+from tests.helpers import new_tenant
 
 
 def test_skill_catalog_is_listed(client: TestClient) -> None:

@@ -66,7 +66,7 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Skill catalog, tenants, hire/list employees API (M1) | Real | Tested over HTTP against Postgres with RLS |
 | Team builder + `POST /goals` (M1) | Real, **fake model** | Coordinator + skill pools (ADR-0007); no real LLM yet |
 | Runs + event log (M1) | Real | `POST /goals` returns 202; events stored per tenant with RLS. Runs execute in-process (**lost on restart** until the worker lands) |
-| Live event stream (M1) | Planned | WebSocket |
+| Live event stream (M1) | Real | WebSocket `/runs/{id}/stream`: replay + live via Redis Streams, Postgres fallback |
 | Auth (M0) | **Stubbed** | Tenant comes from an `X-Tenant-ID` header; do not expose publicly |
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox and tools (M2) | Planned | |
@@ -100,6 +100,9 @@ curl -s localhost:8000/skills | jq '.[].key'
 curl -s -X POST localhost:8000/employees -H "X-Tenant-ID: $T" -H 'content-type: application/json' \
   -d '{"name":"Robin","skills":["react","css"]}'
 curl -s localhost:8000/employees -H "X-Tenant-ID: $T"
+
+# watch a whole run live (creates a demo team, starts a goal, prints WebSocket events)
+uv run scripts/watch_run.py "Build me an LLM wrapper website"
 ```
 
 Langfuse login with the dev defaults from `.env.example`: `admin@staffroom.local` / `staffroom-dev`.

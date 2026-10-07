@@ -43,6 +43,8 @@ services:
       # App role only: not the table owner, so row-level security applies.
       APP_DB_USER: ${APP_DB_USER:-staffroom_app}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:-staffroom_app}
+      # "fake:1" = deterministic fake model, 1 s per reply, so runs are watchable.
+      STAFFROOM_MODEL: ${STAFFROOM_MODEL:-fake:1}
     ports:
       - 127.0.0.1:${API_PORT:-8000}:8000
     healthcheck:  # slim image has no curl

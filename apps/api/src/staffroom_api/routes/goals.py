@@ -2,11 +2,12 @@ import uuid
 from datetime import datetime
 from functools import partial
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, WebSocket, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from staffroom_api import event_stream
 from staffroom_api.agents.events import TeamEvent, team_event
 from staffroom_api.agents.models import chat_model
 from staffroom_api.agents.team import EmployeeSpec, build_team
@@ -62,7 +63,8 @@ async def start_run(
 
     model_name = request.app.state.settings.staffroom_model
     team = build_team(employees, model=partial(chat_model, model_name))
-    background.add_task(execute_run, engine, tenant_id, run.id, team, body.goal)
+    redis = request.app.state.redis
+    background.add_task(execute_run, engine, redis, tenant_id, run.id, team, body.goal)
     return _run_out(run)
 
 
@@ -92,3 +94,38 @@ def _run_out(run: Run) -> RunOut:
         created_at=run.created_at,
         finished_at=run.finished_at,
     )
+
+
+TERMINAL_STATUSES = {"succeeded", "failed"}
+
+
+@router.websocket("/runs/{run_id}/stream")
+async def stream_run(websocket: WebSocket, run_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
+    """Live events for one run: full replay first, then live, then the socket closes.
+
+    STUB auth: the tenant comes from `?tenant_id=` (browsers cannot set headers on
+    WebSockets). Replaced by a token check when auth lands.
+    """
+    state = websocket.app.state
+    async with tenant_transaction(state.db, tenant_id) as conn:
+        run = await AsyncSession(bind=conn).get(Run, run_id)
+    if run is None:
+        await websocket.close(code=4404, reason="Run not found.")  # RLS hides other tenants
+        return
+
+    await websocket.accept()
+    live_feed_gone = run.status in TERMINAL_STATUSES and not await event_stream.exists(
+        state.redis, tenant_id, run_id
+    )
+    if live_feed_gone:
+        # Redis stream expired after the run ended: replay the durable record instead.
+        async with tenant_transaction(state.db, tenant_id) as conn:
+            rows = await conn.execute(
+                select(Event.id, Event.data).where(Event.run_id == run_id).order_by(Event.id)
+            )
+            for event_id, data in rows:
+                await websocket.send_json({"id": event_id, "event": data})
+    else:
+        async for payload in event_stream.follow(state.redis, tenant_id, run_id):
+            await websocket.send_json(payload)
+    await websocket.close()

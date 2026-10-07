@@ -18,7 +18,7 @@ Before using any library API: check the current version (PyPI/npm) and read curr
 
 ## Hard constraints
 
-- **Never commit or push.** The maintainer commits. Propose small Conventional Commit messages instead (`feat:`, `fix:`, `docs:`, `build:`, `ci:`, `chore:`, `test:`, `refactor:`).
+- **Never commit or push.** The maintainer commits. Propose small commit messages instead, formatted `type/scope: subject` (e.g. `feat/agents: add live run events`, `docs: ...`). Types: `feat`, `fix`, `docs`, `build`, `ci`, `chore`, `test`, `refactor`.
 - ADR in `docs/adr/` (MADR format, see `0000-template.md`) for every significant choice, with alternatives considered.
 - Provider-specific model code lives in **one** adapter module. Use LangChain `init_chat_model`; providers switch by config.
 - Frameworks stay behind small interfaces (Protocols) so they can be swapped.
