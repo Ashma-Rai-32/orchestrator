@@ -22,7 +22,9 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [ ] Known gap: a segment that times out (taskiq `timeout`) is cancelled with `CancelledError` (not caught) → run stays `running`. Handle with the watchdog/fix above.
 - [x] Auth (ADR-0003): Keycloak organizations = tenants, realm as code; API verifies tokens with PyJWT; WebSocket token via subprotocol. Header stub removed.
 - [x] M2: hardened Docker sandbox per run (ADR-0006), deepagents FilesystemMiddleware tools for employees, Playwright MCP inside the sandbox (docs/frameworks/playwright-mcp.md).
-- [ ] M2 next: give browser tools to employees with the `testing` skill (skill catalog `tools`), live run.
+- [x] M2: skill catalog `tools` → toolsets (`agents/toolsets.py`); Testing skill gets the browser; live run verified (builders build, tester checks in Chromium).
+- [ ] Next: M3 office UI (Phaser 4) — or observability ADR (Langfuse) first. Ask maintainer.
+- Learned: use `message.text` (not `str(content)`): MCP tools and real models return content-block lists; `.text` is a `TextAccessor` str subclass in langchain-core 1.6.
 - [ ] Deferred until the maintainer has a key: E2B backend behind `SANDBOX_BACKEND=e2b` (check langchain-e2b vs deepagents 0.7 pin).
 - [ ] Remaining M0 ADR: observability (Langfuse wiring) — next free ADR number.
 

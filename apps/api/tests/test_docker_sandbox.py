@@ -76,10 +76,10 @@ async def test_employees_use_the_sandbox_during_a_run(sandbox: DockerSandbox) ->
     )
     result = await team.run("Build a site")
 
-    # Each employee wrote a note via write_file, then ran node via execute.
-    notes = sandbox.execute("ls /workspace/notes").output.split()
-    assert len(notes) == 2
-    assert all("workspace/notes:" in a.result for a in result.assignments)
+    # Each employee wrote a page via write_file, then ran node via execute.
+    pages = sandbox.execute("ls /workspace/site").output.split()
+    assert len(pages) == 2
+    assert all("site pages:" in a.result for a in result.assignments)
 
 
 @pytest.fixture

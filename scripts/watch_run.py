@@ -18,7 +18,12 @@ import websockets
 
 API = "http://localhost:8000"
 TOKEN_URL = "http://localhost:8080/realms/staffroom/protocol/openid-connect/token"
-TEAM = [("Pixel 1", ["react", "css"]), ("Pixel 2", ["react", "css"]), ("Ada", ["nodejs", "ai-integration"])]
+TEAM = [
+    ("Pixel 1", ["react", "css"]),
+    ("Pixel 2", ["react", "css"]),
+    ("Ada", ["nodejs", "ai-integration"]),
+    ("Tess", ["testing"]),  # checks the built site in a real browser
+]
 
 
 async def sign_in(http: httpx.AsyncClient, username: str) -> str:
@@ -37,8 +42,9 @@ async def main(goal: str, username: str) -> None:
         auth = {"Authorization": f"Bearer {token}"}
         me = (await http.get("/me", headers=auth)).json()
         print(f"signed in as {username}, tenant {me['tenant_name']} ({me['tenant_id']})")
-        if not (await http.get("/employees", headers=auth)).json():
-            for name, skills in TEAM:
+        hired = {e["name"] for e in (await http.get("/employees", headers=auth)).json()}
+        for name, skills in TEAM:
+            if name not in hired:
                 await http.post("/employees", json={"name": name, "skills": skills}, headers=auth)
         run = (await http.post("/goals", json={"goal": goal}, headers=auth)).json()
 
@@ -50,7 +56,7 @@ async def main(goal: str, username: str) -> None:
         async for message in ws:
             event = json.loads(message)["event"]
             details = ", ".join(f"{k}={v!r}" for k, v in event.items() if k != "type")
-            print(f"  t={time.monotonic() - start:4.1f}s  {event['type']:<14} {details[:90]}")
+            print(f"  t={time.monotonic() - start:4.1f}s  {event['type']:<14} {details[:150]}")
 
 
 if __name__ == "__main__":

@@ -2,12 +2,13 @@
 
 langchain-core's fakes replay a fixed script and none implements `bind_tools`
 (see docs/frameworks/langchain-models.md). Teams are built from database rows,
-so tool names are not known in advance; this fake reacts to whatever is bound:
+so tool names are not known in advance; this fake reacts to whatever is bound,
+doing what a sensible real model would (sequentially, never racing its own steps):
 
-- coordinator (delegation tools bound) -> call every bound tool once, then summarise
-- employee with sandbox tools          -> write_file, then execute, then report
-  (sequential, as a real model would: a command must not race the file it reads)
-- no tools                             -> report the request as done
+- coordinator (delegation tools)  -> delegate build work, then testing, then summarise
+- tester (browser tools)          -> serve the site, open it, read the page, report
+- builder (sandbox tools)         -> write a page, list the site with node, report
+- no tools                        -> report the request as done
 """
 
 import asyncio
@@ -22,10 +23,13 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
 SANDBOX_TOOLS = {"write_file", "execute"}
-LIST_WORKSPACE = (
+BROWSER_TOOLS = {"browser_navigate", "browser_snapshot"}
+SITE, PORT = "/workspace/site", 4173
+LIST_SITE = (
     "node -e \"const fs=require('fs');"
-    "console.log('workspace/notes:', fs.readdirSync('/workspace/notes').join(', '))\""
+    f"console.log('site pages:', fs.readdirSync('{SITE}').join(', '))\""
 )
+SERVE_SITE = f"mkdir -p {SITE} && (nohup python3 -m http.server {PORT} -d {SITE} >/dev/null 2>&1 &)"
 
 
 class RuleBasedFakeModel(BaseChatModel):
@@ -61,23 +65,50 @@ class RuleBasedFakeModel(BaseChatModel):
 
     def _reply(self, messages: list[BaseMessage]) -> AIMessage:
         request = next(str(m.content) for m in reversed(messages) if isinstance(m, HumanMessage))
-        results = [str(m.content) for m in messages if isinstance(m, ToolMessage)]
-        if set(self.tool_names) >= SANDBOX_TOOLS:
-            return self._sandbox_step(request, results)
-        if results:
-            return AIMessage(content="All done. " + " | ".join(results))
-        if self.tool_names:
-            return _calls([(name, {"task": f"{request} [{name}]"}) for name in self.tool_names])
+        # `.text` joins content blocks; MCP tools return lists of blocks, not strings.
+        results = [str(m.text) for m in messages if isinstance(m, ToolMessage)]
+        tools = set(self.tool_names)
+        if tools >= BROWSER_TOOLS:
+            return _tester_step(request, results)
+        if tools >= SANDBOX_TOOLS:
+            return _builder_step(request, results)
+        if tools:
+            return _coordinator_step(request, results, self.tool_names)
         return AIMessage(content=f"Done: {request}")
 
-    @staticmethod
-    def _sandbox_step(request: str, results: list[str]) -> AIMessage:
-        if not results:
-            note = f"/workspace/notes/{hashlib.sha256(request.encode()).hexdigest()[:8]}.md"
-            return _calls([("write_file", {"file_path": note, "content": f"# Task\n{request}\n"})])
-        if len(results) == 1:
-            return _calls([("execute", {"command": LIST_WORKSPACE})])
-        return AIMessage(content=f"Done: {request}. {results[-1].strip()}")
+
+def _coordinator_step(request: str, results: list[str], tool_names: tuple[str, ...]) -> AIMessage:
+    build = [t for t in tool_names if "testing" not in t]
+    test = [t for t in tool_names if "testing" in t]
+    if not results:
+        first = build or test
+        return _calls([(t, {"task": f"{request} [{t}]"}) for t in first])
+    if build and test and len(results) == len(build):
+        return _calls([(t, {"task": f"Check the site in a browser [{t}]"}) for t in test])
+    return AIMessage(content="All done. " + " | ".join(results))
+
+
+def _builder_step(request: str, results: list[str]) -> AIMessage:
+    if not results:
+        page = f"{SITE}/{hashlib.sha256(request.encode()).hexdigest()[:8]}.html"
+        html = f"<html><body><h1>{request}</h1></body></html>\n"
+        return _calls([("write_file", {"file_path": page, "content": html})])
+    if len(results) == 1:
+        return _calls([("execute", {"command": LIST_SITE})])
+    return AIMessage(content=f"Done: {request}. {results[-1].strip()}")
+
+
+def _tester_step(request: str, results: list[str]) -> AIMessage:
+    steps: list[tuple[str, dict[str, Any]]] = [
+        ("execute", {"command": SERVE_SITE}),
+        ("browser_wait_for", {"time": 1}),
+        ("browser_navigate", {"url": f"http://localhost:{PORT}/"}),
+        ("browser_snapshot", {}),
+    ]
+    if len(results) < len(steps):
+        return _calls([steps[len(results)]])
+    seen = [line.strip("- ") for line in results[-1].splitlines() if "link" in line]
+    return AIMessage(content=f"Checked in a browser: the site lists {len(seen)} page(s): {seen}")
 
 
 def _calls(calls: list[tuple[str, dict[str, Any]]]) -> AIMessage:

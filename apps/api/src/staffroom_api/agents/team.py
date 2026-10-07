@@ -10,7 +10,7 @@ the same skill set share one tool (a pool), so tool count = distinct skill sets.
 import itertools
 import re
 from collections import defaultdict
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -77,8 +77,9 @@ class _LangGraphTeam:
         model: ModelFactory,
         checkpointer: BaseCheckpointSaver[Any] | None,
         sandbox: SandboxBackendProtocol | None,
+        toolsets: Mapping[str, list[BaseTool]],
     ) -> None:
-        agents = {e.name: self._employee_agent(e, model(), sandbox) for e in employees}
+        agents = {e.name: self._employee_agent(e, model(), sandbox, toolsets) for e in employees}
 
         pools: dict[tuple[str, ...], list[str]] = defaultdict(list)
         for e in employees:
@@ -97,8 +98,14 @@ class _LangGraphTeam:
 
     @staticmethod
     def _employee_agent(
-        e: EmployeeSpec, model: BaseChatModel, sandbox: SandboxBackendProtocol | None
+        e: EmployeeSpec,
+        model: BaseChatModel,
+        sandbox: SandboxBackendProtocol | None,
+        toolsets: Mapping[str, list[BaseTool]],
     ) -> Any:
+        profile = merge_skills(e.skills)
+        # Skill-specific tools, e.g. the browser for `testing` (catalog.toml `tools`).
+        skill_tools = [tool for name in profile.tools for tool in toolsets.get(name, [])]
         middleware: list[Any] = [ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS_PER_RUN)]
         if sandbox is not None:
             # deepagents: ls/read_file/write_file/edit_file/glob/grep/execute on the run's
@@ -106,8 +113,8 @@ class _LangGraphTeam:
             middleware.append(FilesystemMiddleware(backend=sandbox))
         return create_agent(
             model,
-            tools=[],  # skill-specific tools: later, resolved from merge_skills(...).tools
-            system_prompt=merge_skills(e.skills).system_prompt,
+            tools=skill_tools,
+            system_prompt=profile.system_prompt,
             middleware=middleware,
             name=e.name,
             checkpointer=False,  # don't inherit the coordinator's; a task is redone as a whole
@@ -139,7 +146,7 @@ class _LangGraphTeam:
                 yield team_event.validate_python(part["data"])
             elif part["type"] == "values":
                 final = part["data"]
-        yield RunFinished(summary=str(final["messages"][-1].content))
+        yield RunFinished(summary=str(final["messages"][-1].text))
 
     async def run(self, goal: str) -> TeamResult:
         """Convenience: consume the stream and return the outcome."""
@@ -165,7 +172,8 @@ def _pool_tool(skills: tuple[str, ...], names: list[str], agents: dict[str, Any]
         emit = runtime.stream_writer  # a plain callable (docstring's `.write` is wrong)
         emit(TaskAssigned(employee=name, task=task).model_dump())
         result = await agents[name].ainvoke({"messages": [{"role": "user", "content": task}]})
-        answer = str(result["messages"][-1].content)
+        # .text joins content blocks: real models (and MCP tools) may return lists of blocks.
+        answer = str(result["messages"][-1].text)
         emit(TaskFinished(employee=name, result=answer).model_dump())
         return f"{name}: {answer}"
 
@@ -185,7 +193,13 @@ def build_team(
     model: ModelFactory,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
     sandbox: SandboxBackendProtocol | None = None,
+    toolsets: Mapping[str, list[BaseTool]] | None = None,
 ) -> _LangGraphTeam:
     if not employees:
         raise ValueError("a team needs at least one employee")
-    return _LangGraphTeam(employees, model, checkpointer, sandbox)
+    return _LangGraphTeam(employees, model, checkpointer, sandbox, toolsets or {})
+
+
+def toolsets_needed(employees: list[EmployeeSpec]) -> set[str]:
+    """Which named toolsets the team's skills ask for (open only those)."""
+    return {name for e in employees for name in merge_skills(e.skills).tools}

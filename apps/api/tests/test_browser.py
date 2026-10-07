@@ -5,6 +5,9 @@ from collections.abc import Iterator
 
 import pytest
 
+from staffroom_api.agents.models import chat_model
+from staffroom_api.agents.team import EmployeeSpec, build_team, toolsets_needed
+from staffroom_api.agents.toolsets import open_toolsets
 from staffroom_api.sandbox.browser import ALLOWED_TOOLS, browser_tools
 from staffroom_api.sandbox.docker_backend import DockerSandbox
 
@@ -48,3 +51,27 @@ async def test_only_curated_tools_are_offered(site: DockerSandbox) -> None:
     assert names <= ALLOWED_TOOLS
     assert "browser_run_code_unsafe" not in names
     assert {"browser_navigate", "browser_snapshot", "browser_click"} <= names
+
+
+async def test_tester_checks_colleagues_work_in_a_browser() -> None:
+    """Builder writes a page; the `testing` employee serves it and reads it in Chromium."""
+    sandbox = DockerSandbox(uuid.uuid4(), uuid.uuid4(), image="staffroom-sandbox:dev")
+    team_members = [EmployeeSpec("Robin", ["react"]), EmployeeSpec("Tess", ["testing"])]
+    try:
+        assert toolsets_needed(team_members) == {"browser"}
+        async with open_toolsets(toolsets_needed(team_members), sandbox) as toolsets:
+            team = build_team(
+                team_members,
+                model=lambda: chat_model("fake"),
+                sandbox=sandbox,
+                toolsets=toolsets,
+            )
+            result = await team.run("Build a landing page")
+    finally:
+        sandbox.close(keep_workspace=False)
+
+    by_employee = {a.employee: a for a in result.assignments}
+    assert list(by_employee) == ["Robin", "Tess"]  # built first, then tested
+    assert "the site lists 1 page(s)" in by_employee["Tess"].result  # one builder, one page
+    assert "type" not in by_employee["Tess"].result  # plain text, not content-block repr
+    assert ".html" in by_employee["Tess"].result

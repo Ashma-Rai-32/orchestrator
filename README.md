@@ -74,7 +74,7 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox: hardened Docker per run (M2) | Real, **dev/CI grade** | deepagents backend protocol ([ADR-0006](docs/adr/0006-sandbox-deepagents-backends.md)); worker reaches Docker only via a socket proxy; E2B planned for production |
 | Agent file + execute tools (M2) | Real | deepagents `FilesystemMiddleware`; one workspace volume per run, kept after the run |
-| Browser tools: Playwright MCP in the sandbox (M2) | Real, **not given to employees yet** | langchain-mcp-adapters over `docker exec` stdio; curated tool set |
+| Browser tools: Playwright MCP in the sandbox (M2) | Real | Employees with the Testing skill check the built site in Chromium; langchain-mcp-adapters over `docker exec` stdio; curated tool set |
 | Office UI (M3) | Planned | |
 | Real model end-to-end run (M4) | Planned | |
 | Durability across restarts / logout (M5) | Planned | |

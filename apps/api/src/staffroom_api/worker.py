@@ -14,7 +14,8 @@ from taskiq import AsyncBroker, Context, InMemoryBroker, TaskiqDepends, TaskiqEv
 
 from staffroom_api.agents.checkpoints import run_checkpointer
 from staffroom_api.agents.models import chat_model
-from staffroom_api.agents.team import EmployeeSpec, build_team
+from staffroom_api.agents.team import EmployeeSpec, build_team, toolsets_needed
+from staffroom_api.agents.toolsets import open_toolsets
 from staffroom_api.broker import ReclaimingRedisStreamBroker
 from staffroom_api.db.models import Employee, Run
 from staffroom_api.db.tenancy import tenant_transaction
@@ -70,11 +71,16 @@ async def run_segment(tenant_id: str, run_id: str, context: Context = TaskiqDepe
 
     # Checkpoints make the run resumable: if this worker dies, the redelivered
     # message lands on another worker, which continues from the last checkpoint.
-    async with run_checkpointer(s, tid) as checkpointer, run_sandbox(s, tid, rid) as sandbox:
+    async with (
+        run_checkpointer(s, tid) as checkpointer,
+        run_sandbox(s, tid, rid) as sandbox,
+        open_toolsets(toolsets_needed(employees), sandbox) as toolsets,
+    ):
         team = build_team(
             employees,
             model=partial(chat_model, s.staffroom_model),
             checkpointer=checkpointer,
             sandbox=sandbox,
+            toolsets=toolsets,
         )
         await execute_run(db, redis, tid, rid, team, goal)

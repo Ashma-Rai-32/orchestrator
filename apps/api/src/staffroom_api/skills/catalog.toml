@@ -35,4 +35,4 @@ tools = []
 name = "Testing"
 description = "Writes automated tests and checks sites in a real browser."
 prompt = "You write focused automated tests and verify pages in a real browser before calling work done."
-tools = []
+tools = ["browser"]
