@@ -11,6 +11,8 @@ export type InboxItem = {
   employee: string
   question: string
   secret_name: string | null // a credential: answered into the secret store, never shown again
+  kind: 'question' | 'approval' // approval: approve/reject publishing, with a preview
+  preview_url: string | null
 }
 export type Run = { id: string; goal: string; status: string; summary: string | null }
 
@@ -60,5 +62,7 @@ export const api = {
   inbox: () => call<InboxItem[]>('GET', '/inbox'),
   answer: (itemId: string, answer: string) =>
     call<{ run_resumed: boolean }>('POST', `/inbox/${itemId}/answer`, { answer }),
+  decide: (itemId: string, approve: boolean, feedback?: string) =>
+    call<{ run_resumed: boolean }>('POST', `/inbox/${itemId}/decision`, { approve, feedback }),
   followRun,
 }

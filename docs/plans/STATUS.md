@@ -30,7 +30,10 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - Fixed on the way: GraphInterrupt swallowed by the failed-task handler (re-raise GraphBubbleUp); runs stuck `queued` on setup errors; Alembic autogenerate wanted to DROP the checkpoint tables (include_object filter + test); labels not following walking characters (Phaser Container).
 - [x] M6.2a/b: OpenBao secret store (ADR-0009, dev mode in compose); `ask_admin(secret_name=...)`; inbox password field; value goes to OpenBao only. Verified live: value in OpenBao, 0 occurrences in a full Postgres dump and in Redis streams.
 - [x] M6.2c: tenant secrets as per-command env vars in the sandbox; values masked in command output and downloads (limits in ADR-0009).
-- [ ] **Next: M6.3 deploy with approval** (preview → admin approves → publish), then M7 evals.
+- [x] M6.3 deploy with approval: `deploy_site` → private preview (Caddy, unguessable token incl. thread id) → approval card in the office (preview link, Approve/Reject + feedback) → publish to /sites/<company>/ only on approve. Verified live: preview 200, public 404 before approval, 200 after.
+- [x] **M6 complete** (6.4 office inbox delivered with 6.1–6.3).
+- [ ] **Next: M7 research harness / evals** (benchmark goals × models/team configs, scored from Langfuse traces + browser checks; incl. "summary claims vs. what the trace shows" honesty metric).
+- Production follow-ups recorded: previews behind auth; OpenBao non-dev + AppRole; egress controls; per-employee secret scoping.
 - Office polish backlog adds: overlapping bubbles at the huddle.
 - [ ] Secrets: inbox form → secret store; agents get secret names only (also covers secrets typed into goals).
 - [ ] Office polish backlog (deferred by maintainer, 2026-10-07: "do it later"): real CC0 art (Kenney; isometric option), pathfinding, character variants, inbox panel, hire UI. Decision: stay 2D; no 3D.

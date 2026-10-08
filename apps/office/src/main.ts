@@ -70,9 +70,67 @@ async function follow(runId: string): Promise<void> {
 async function refreshInbox(): Promise<InboxItem[]> {
   const items = await api.inbox()
   const list = $<HTMLUListElement>('#inbox-items')
-  list.replaceChildren(...items.map(renderQuestion))
+  list.replaceChildren(...items.map(renderItem))
   $('#inbox').hidden = items.length === 0
   return items
+}
+
+function renderItem(item: InboxItem): HTMLLIElement {
+  return item.kind === 'approval' ? renderApproval(item) : renderQuestion(item)
+}
+
+/** "Robin wants to publish the website" + preview link + Approve / Reject (with feedback). */
+function renderApproval(item: InboxItem): HTMLLIElement {
+  const who = document.createElement('strong')
+  who.textContent = item.employee
+  const text = document.createElement('p')
+  text.append(who, ` asks for approval: ${item.question.replace(`${item.employee} wants to `, 'can we ')}`)
+
+  const preview = document.createElement('a')
+  preview.textContent = 'Preview the site ↗'
+  preview.target = '_blank'
+  preview.rel = 'noopener noreferrer'
+  // Built by the server, but still only allow http(s) links.
+  if (item.preview_url && /^https?:\/\//.test(item.preview_url)) preview.href = item.preview_url
+
+  const feedback = document.createElement('input')
+  feedback.placeholder = 'Feedback if you reject (optional)'
+  feedback.maxLength = 2000
+  const approve = document.createElement('button')
+  approve.type = 'button'
+  approve.textContent = 'Approve & publish'
+  approve.className = 'approve'
+  const reject = document.createElement('button')
+  reject.type = 'button'
+  reject.textContent = 'Reject'
+
+  const decideWith = (yes: boolean) => {
+    approve.disabled = reject.disabled = true
+    void decide(item, yes, feedback.value.trim() || undefined).finally(
+      () => (approve.disabled = reject.disabled = false),
+    )
+  }
+  approve.addEventListener('click', () => decideWith(true))
+  reject.addEventListener('click', () => decideWith(false))
+
+  const actions = document.createElement('form')
+  actions.addEventListener('submit', (submit) => submit.preventDefault())
+  actions.append(feedback, reject, approve)
+  const li = document.createElement('li')
+  li.className = 'approval'
+  li.append(text, preview, actions)
+  return li
+}
+
+async function decide(item: InboxItem, approve: boolean, feedback?: string): Promise<void> {
+  try {
+    const { run_resumed } = await api.decide(item.id, approve, feedback)
+    status(approve ? 'Approved: your team is publishing the site.' : 'Rejected: your team will rework it.')
+    await refreshInbox()
+    if (run_resumed) void follow(item.run_id)
+  } catch (error: unknown) {
+    status(`Could not send your decision: ${String(error)}`)
+  }
 }
 
 function renderQuestion(item: InboxItem): HTMLLIElement {

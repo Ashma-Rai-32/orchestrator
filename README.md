@@ -81,7 +81,7 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Durability across restarts / logout (M5) | Planned | |
 | Admin inbox (M6.1) | Real | Employees ask via `ask_admin` (LangGraph interrupt); run waits without holding a worker; answer in the office to resume |
 | Secret store (M6.2) | Real, **dev mode** | OpenBao ([ADR-0009](docs/adr/0009-secret-store-openbao.md)); credentials entered in the inbox go to OpenBao only, agents get the name; sandbox commands get them as env vars, values masked in output |
-| Deploy with admin approval (M6.3) | Planned | |
+| Deploy with admin approval (M6.3) | Real, **local host** | `deploy_site` → private preview → Approve/Reject in the office → published at `http://localhost:8090/sites/<company>/` (Caddy). Previews protected by unguessable URL only; AWS publishing later |
 | Research harness (M7) | Planned | |
 
 Plan and progress: [docs/plans/](docs/plans/). Decisions: [docs/adr/](docs/adr/). Framework findings: [docs/frameworks/](docs/frameworks/).

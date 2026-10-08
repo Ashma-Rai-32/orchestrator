@@ -110,3 +110,14 @@ button {
 #inbox-items small {
   color: #c9b98a;
 }
+
+#inbox-items li.approval a {
+  display: inline-block;
+  margin: 2px 0 6px;
+  color: #7fd1ff;
+}
+
+#inbox-items button.approve {
+  background: #2e7d32;
+  border-color: #43a047;
+}
