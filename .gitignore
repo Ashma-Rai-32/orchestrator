@@ -29,3 +29,6 @@ playwright-report/
 .vscode/
 .DS_Store
 *README.md
+
+# Experiment reports: keep real-model runs, skip fake-model smoke runs
+experiments/results/*-fake-*.md

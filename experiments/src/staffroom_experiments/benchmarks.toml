@@ -1,0 +1,14 @@
+# Benchmark briefs (M7). Each must be checkable from the built site alone.
+# `expect`: words the published page should contain (case-insensitive) -> brief coverage.
+
+[coffee-landing]
+goal = "Build a one-page website (index.html) for a coffee shop called Bean There: opening hours, a short menu, and a contact section."
+expect = ["Bean There", "hours", "menu", "contact"]
+
+[saas-pricing]
+goal = "Build a one-page website (index.html) for a note-taking app called Quillo with a hero section and a pricing table with three plans: Free, Pro and Team."
+expect = ["Quillo", "Free", "Pro", "Team", "pricing"]
+
+[portfolio]
+goal = "Build a one-page portfolio website (index.html) for a designer named Rosa Vale with an about section, three projects and a contact email."
+expect = ["Rosa Vale", "about", "projects", "contact"]

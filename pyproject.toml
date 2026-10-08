@@ -2,7 +2,7 @@
 # packages/schemas joins `members` when it is created.
 
 [tool.uv.workspace]
-members = ["apps/api"]
+members = ["apps/api", "experiments"]
 
 [dependency-groups]
 dev = [
@@ -38,7 +38,7 @@ select = [
 extend-immutable-calls = ["taskiq.TaskiqDepends", "fastapi.Depends", "fastapi.Query"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["staffroom_api"]
+known-first-party = ["staffroom_api", "staffroom_experiments"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101", "S105", "S106"]  # asserts, fake secrets, throwaway passwords

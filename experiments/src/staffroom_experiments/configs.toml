@@ -1,0 +1,34 @@
+# Agent-system variants to compare (M7). Model strings go through the single model adapter.
+
+[fake-duo]
+description = "Deterministic fake model; harness smoke test (no API key, CI-safe)."
+model = "fake"
+team = [
+  { name = "Pixel 1", skills = ["react", "css"] },
+  { name = "Tess", skills = ["testing"] },
+]
+
+[flash-lite-duo]
+description = "Gemini free tier, one builder + one tester."
+model = "google_genai:gemini-3.5-flash-lite"
+fallbacks = ["google_genai:gemini-3.1-flash-lite"]
+requests_per_second = 0.1
+team = [
+  { name = "Pixel 1", skills = ["react", "css"] },
+  { name = "Tess", skills = ["testing"] },
+]
+
+[flash-lite-solo]
+description = "Same model, builder only: does a tester change the outcome?"
+model = "google_genai:gemini-3.5-flash-lite"
+fallbacks = ["google_genai:gemini-3.1-flash-lite"]
+requests_per_second = 0.1
+team = [{ name = "Pixel 1", skills = ["react", "css"] }]
+
+[ollama-duo]
+description = "Local model (slow on a laptop): run overnight."
+model = "ollama:qwen3.5:4b"
+team = [
+  { name = "Pixel 1", skills = ["react", "css"] },
+  { name = "Tess", skills = ["testing"] },
+]

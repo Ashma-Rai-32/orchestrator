@@ -10,6 +10,7 @@ resolution-markers = [
 [manifest]
 members = [
     "staffroom-api",
+    "staffroom-experiments",
 ]
 
 [manifest.dependency-groups]
@@ -3120,6 +3121,17 @@ dev = [
     { name = "types-docker", specifier = ">=7.2.0.20261006" },
     { name = "types-hvac", specifier = ">=2.4.0.20260731" },
 ]
+
+[[package]]
+name = "staffroom-experiments"
+version = "0.1.0"
+source = { editable = "experiments" }
+dependencies = [
+    { name = "staffroom-api" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "staffroom-api", editable = "apps/api" }]
 
 [[package]]
 name = "starlette"

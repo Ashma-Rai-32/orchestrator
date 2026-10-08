@@ -110,8 +110,9 @@ def _asking_step(request: str, results: list[str]) -> AIMessage:
 
 def _builder_step(request: str, results: list[str], deploy: bool) -> AIMessage:
     if not results:
-        # With DEPLOY the page is the site's index.html (deploy_site requires one).
-        name = "index" if deploy else hashlib.sha256(request.encode()).hexdigest()[:8]
+        # index.html when deploying (deploy_site requires one) or when the brief asks for it.
+        wants_index = deploy or "index.html" in request
+        name = "index" if wants_index else hashlib.sha256(request.encode()).hexdigest()[:8]
         html = f"<html><body><h1>{request}</h1></body></html>\n"
         return _calls([("write_file", {"file_path": f"{SITE}/{name}.html", "content": html})])
     if len(results) == 1:
