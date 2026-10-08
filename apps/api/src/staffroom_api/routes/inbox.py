@@ -21,12 +21,14 @@ class InboxItemOut(BaseModel):
     run_id: uuid.UUID
     employee: str
     question: str
+    secret_name: str | None  # a credential: the office shows a password field
     status: str
     created_at: datetime
 
 
 class Answer(BaseModel):
-    answer: str = Field(min_length=1, max_length=2000)
+    # For credentials this is the secret value: it goes to the secret store only.
+    answer: str = Field(min_length=1, max_length=8000)
 
 
 class AnswerResult(BaseModel):
@@ -59,7 +61,20 @@ async def answer_question(
         if item.status != "open" or run is None or run.status != "waiting":
             raise HTTPException(status.HTTP_409_CONFLICT, "This question was already answered.")
 
-        item.status, item.answer, item.answered_at = "answered", body.answer, datetime.now(UTC)
+        if item.secret_name:
+            store = request.app.state.secrets
+            if store is None:
+                raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Secret store not set up.")
+            # The value goes to OpenBao only (ADR-0009); this table and the employee get
+            # the name. If the commit below fails, a retry simply overwrites the value.
+            await store.put(tenant_id, item.secret_name, body.answer)
+            recorded = (
+                f"Stored securely as {item.secret_name}. Your commands can read it from the "
+                f"environment variable {item.secret_name}."
+            )
+        else:
+            recorded = body.answer
+        item.status, item.answer, item.answered_at = "answered", recorded, datetime.now(UTC)
         await session.flush()
 
         still_open = await session.scalar(
@@ -88,6 +103,7 @@ def _out(item: InboxItem) -> InboxItemOut:
         run_id=item.run_id,
         employee=item.employee,
         question=item.question,
+        secret_name=item.secret_name,
         status=item.status,
         created_at=item.created_at,
     )

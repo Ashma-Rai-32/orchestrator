@@ -9,11 +9,16 @@ from taskiq import InMemoryBroker
 
 from staffroom_api.auth import TokenVerifier
 from staffroom_api.routes import catalog, employees, goals, health, inbox, tenants
+from staffroom_api.secrets import OpenBaoSecretStore, SecretStore
 from staffroom_api.settings import Settings
 from staffroom_api.worker import broker
 
 
-def create_app(settings: Settings | None = None, verifier: TokenVerifier | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    verifier: TokenVerifier | None = None,
+    secrets: SecretStore | None = None,
+) -> FastAPI:
     settings = settings or Settings()
     verifier = verifier or TokenVerifier.from_settings(settings)
 
@@ -22,6 +27,7 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
         # Shared clients live for the app's lifetime; routes read them from app.state.
         app.state.settings = settings
         app.state.verifier = verifier
+        app.state.secrets = secrets or _secret_store(settings)
         app.state.db = create_async_engine(settings.database_url, pool_pre_ping=True)
         app.state.redis = Redis.from_url(settings.redis_url, socket_timeout=2)
         await _start_broker(app, settings)
@@ -42,6 +48,12 @@ def create_app(settings: Settings | None = None, verifier: TokenVerifier | None 
     for module in (health, catalog, tenants, employees, goals, inbox):
         app.include_router(module.router)
     return app
+
+
+def _secret_store(settings: Settings) -> SecretStore | None:
+    if settings.openbao_token is None:
+        return None
+    return OpenBaoSecretStore(settings.openbao_url, settings.openbao_token.get_secret_value())
 
 
 async def _start_broker(app: FastAPI, settings: Settings) -> None:

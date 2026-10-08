@@ -80,7 +80,7 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Real model end-to-end run (M4) | Planned | |
 | Durability across restarts / logout (M5) | Planned | |
 | Admin inbox (M6.1) | Real | Employees ask via `ask_admin` (LangGraph interrupt); run waits without holding a worker; answer in the office to resume |
-| Secret store (M6.2) | Planned | Answers are plain text until then |
+| Secret store (M6.2) | Real, **dev mode** | OpenBao ([ADR-0009](docs/adr/0009-secret-store-openbao.md)); credentials entered in the inbox go to OpenBao only, agents get the name. Not yet injected into sandbox commands |
 | Deploy with admin approval (M6.3) | Planned | |
 | Research harness (M7) | Planned | |
 

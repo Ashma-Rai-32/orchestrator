@@ -106,3 +106,7 @@ button {
   border-radius: 6px;
   padding: 4px 8px;
 }
+
+#inbox-items small {
+  color: #c9b98a;
+}

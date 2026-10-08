@@ -15,7 +15,7 @@ AUDIENCE = "staffroom-api"
 _KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
-def test_verifier() -> TokenVerifier:
+def fake_verifier() -> TokenVerifier:
     public_key = _KEY.public_key()
     return TokenVerifier(ISSUER, AUDIENCE, key_for=lambda _token: public_key)
 

@@ -84,8 +84,17 @@ function renderQuestion(item: InboxItem): HTMLLIElement {
 
   const input = document.createElement('input')
   input.required = true
-  input.maxLength = 2000
+  input.maxLength = 8000
   input.placeholder = 'Your answer'
+  if (item.secret_name) {
+    // A credential: masked, not remembered by the browser, stored in OpenBao by the API.
+    input.type = 'password'
+    input.autocomplete = 'off'
+    input.placeholder = `Paste the key (stored securely as ${item.secret_name})`
+    const note = document.createElement('small')
+    note.textContent = `Your team will only ever see the name ${item.secret_name}, never the value.`
+    question.append(document.createElement('br'), note)
+  }
   const send = document.createElement('button')
   send.type = 'submit'
   send.textContent = 'Send'
@@ -94,7 +103,9 @@ function renderQuestion(item: InboxItem): HTMLLIElement {
   form.addEventListener('submit', (submit) => {
     submit.preventDefault()
     send.disabled = true
-    void answer(item, input.value.trim()).finally(() => (send.disabled = false))
+    const text = input.value.trim()
+    input.value = '' // don't leave a pasted key sitting in the page
+    void answer(item, text).finally(() => (send.disabled = false))
   })
 
   const li = document.createElement('li')

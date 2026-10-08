@@ -25,6 +25,7 @@ from langchain_core.utils.function_calling import convert_to_openai_tool
 
 SANDBOX_TOOLS = {"write_file", "execute"}
 ASK = "ASK:"  # test/demo trigger: "... ASK: which colours do you like?"
+CREDENTIAL_TRIGGER = "SECRET:"  # with ASK: "... ASK: I need an API key SECRET: OPENAI_API_KEY"
 BROWSER_TOOLS = {"browser_navigate", "browser_snapshot"}
 SITE, PORT = "/workspace/site", 4173
 LIST_SITE = (
@@ -93,10 +94,15 @@ def _coordinator_step(request: str, results: list[str], tool_names: tuple[str, .
 
 
 def _asking_step(request: str, results: list[str]) -> AIMessage:
-    """Tasks containing "ASK: <question>" make the employee ask the admin first."""
+    """Tasks containing "ASK: <question>" make the employee ask the admin first;
+    "SECRET: <NAME>" in the task asks for that credential instead."""
     if not results:
-        question = request.split(ASK, 1)[1].split("[assign_")[0].strip()
-        return _calls([("ask_admin", {"question": question})])
+        asked = request.split(ASK, 1)[1].split("[assign_")[0]
+        question = asked.split(CREDENTIAL_TRIGGER)[0].strip()
+        args: dict[str, Any] = {"question": question}
+        if CREDENTIAL_TRIGGER in request:
+            args["secret_name"] = request.split(CREDENTIAL_TRIGGER, 1)[1].split()[0]
+        return _calls([("ask_admin", args)])
     return AIMessage(content=f"Done, using the admin's answer. {results[-1]}")
 
 

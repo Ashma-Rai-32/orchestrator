@@ -5,7 +5,13 @@ const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export type Me = { user_id: string; tenant_id: string; tenant_name: string }
 export type Employee = { id: string; name: string; skills: string[]; created_at: string }
-export type InboxItem = { id: string; run_id: string; employee: string; question: string }
+export type InboxItem = {
+  id: string
+  run_id: string
+  employee: string
+  question: string
+  secret_name: string | null // a credential: answered into the secret store, never shown again
+}
 export type Run = { id: string; goal: string; status: string; summary: string | null }
 
 /** Mirrors staffroom_api.agents.events (a discriminated union on `type`). */

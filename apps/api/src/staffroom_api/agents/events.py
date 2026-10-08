@@ -47,6 +47,7 @@ class InputNeeded(BaseModel):
     question_id: str  # the LangGraph interrupt id; answers are matched to it on resume
     employee: str
     question: str
+    secret_name: str | None = None  # a credential: the answer goes to the secret store
 
 
 class RunWaiting(BaseModel):

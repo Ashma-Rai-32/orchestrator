@@ -78,6 +78,7 @@ async def _open_inbox_item(
                 question_id=event.question_id,
                 employee=event.employee,
                 question=event.question,
+                secret_name=event.secret_name,
             )
             .on_conflict_do_nothing(index_elements=["run_id", "question_id"])
         )

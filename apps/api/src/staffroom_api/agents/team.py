@@ -41,6 +41,7 @@ from staffroom_api.agents.events import (
     TeamEvent,
     team_event,
 )
+from staffroom_api.secrets import check_name
 from staffroom_api.skills.catalog import merge_skills
 
 log = logging.getLogger(__name__)
@@ -218,6 +219,7 @@ class _LangGraphTeam:
                         question_id=question.id,
                         employee=question.value["employee"],
                         question=question.value["question"],
+                        secret_name=question.value.get("secret_name"),
                     )
                 yield RunWaiting(open_questions=len(pending))
                 return
@@ -247,17 +249,22 @@ ASK_ADMIN_DOC = (
     "Ask the founder (the admin) when you are truly blocked: information only they have, "
     "a decision only they can make, or an account/API key. Ask one clear question in plain, "
     "non-technical language. The work pauses until they answer, possibly for hours, so "
-    "decide everything you reasonably can yourself. For credentials, ask for the key to be "
-    "added and you will receive its name, never the secret itself."
+    "decide everything you reasonably can yourself. For a credential (API key, password), "
+    "set secret_name to an environment-variable style name such as OPENAI_API_KEY: the "
+    "admin stores it securely and you get the name back, never the value. Your commands "
+    "can then read it from that environment variable."
 )
 
 
 def _ask_admin_tool(employee: str) -> BaseTool:
     """Pause the run with a question for the admin's inbox (LangGraph interrupt)."""
 
-    def ask_admin(question: str) -> str:
+    def ask_admin(question: str, secret_name: str | None = None) -> str:
+        """`secret_name`: set it (e.g. OPENAI_API_KEY) when you need a credential."""
+        if secret_name is not None:
+            check_name(secret_name)  # raises: the model sees the rule and can retry
         # No side effects before interrupt(): on resume this tool runs again from the top.
-        answer = interrupt({"employee": employee, "question": question})
+        answer = interrupt({"employee": employee, "question": question, "secret_name": secret_name})
         return f"The admin answered: {answer}"
 
     return StructuredTool.from_function(ask_admin, name="ask_admin", description=ASK_ADMIN_DOC)

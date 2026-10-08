@@ -97,8 +97,11 @@ class InboxItem(Base):
     question_id: Mapped[str] = mapped_column(String(100))  # LangGraph interrupt id
     employee: Mapped[str] = mapped_column(String(200))
     question: Mapped[str] = mapped_column(Text)
+    # Set when the employee needs a credential: the answer goes to the secret store
+    # under this name (ADR-0009) and is never written to this table.
+    secret_name: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), server_default="open")  # open | answered
-    # Plain text for now. Secret answers move to the secret store (roadmap 6.2).
+    # Plain answers only; for secrets this holds "stored as NAME", never the value.
     answer: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
