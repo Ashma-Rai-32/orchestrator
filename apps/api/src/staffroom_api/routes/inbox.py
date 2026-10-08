@@ -1,6 +1,7 @@
 """The admin's inbox: questions employees asked (paused runs), and answering them."""
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -8,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from staffroom_api.agents.deploy import APPROVE
 from staffroom_api.db.models import InboxItem, Run
 from staffroom_api.db.tenancy import tenant_transaction
 from staffroom_api.deps import TenantId, TenantSession
@@ -22,6 +24,8 @@ class InboxItemOut(BaseModel):
     employee: str
     question: str
     secret_name: str | None  # a credential: the office shows a password field
+    kind: str  # question | approval
+    preview_url: str | None  # approval: the private preview to review
     status: str
     created_at: datetime
 
@@ -29,6 +33,11 @@ class InboxItemOut(BaseModel):
 class Answer(BaseModel):
     # For credentials this is the secret value: it goes to the secret store only.
     answer: str = Field(min_length=1, max_length=8000)
+
+
+class Decision(BaseModel):
+    approve: bool
+    feedback: str | None = Field(default=None, max_length=2000)  # why, when rejecting
 
 
 class AnswerResult(BaseModel):
@@ -48,33 +57,64 @@ async def list_open_questions(session: TenantSession) -> list[InboxItemOut]:
 async def answer_question(
     item_id: uuid.UUID, body: Answer, tenant_id: TenantId, request: Request
 ) -> AnswerResult:
-    """Record the answer; when the run has no open questions left, resume it once."""
+    """Answer a question (or provide a secret). Approvals use /decision instead."""
+
+    async def record(item: InboxItem) -> str:
+        if item.kind != "question":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Use /decision for approvals.")
+        if not item.secret_name:
+            return body.answer
+        store = request.app.state.secrets
+        if store is None:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Secret store not set up.")
+        # The value goes to OpenBao only (ADR-0009); this table and the employee get the
+        # name. If the commit fails afterwards, a retry simply overwrites the value.
+        await store.put(tenant_id, item.secret_name, body.answer)
+        return (
+            f"Stored securely as {item.secret_name}. Your commands can read it from the "
+            f"environment variable {item.secret_name}."
+        )
+
+    return await _settle(item_id, tenant_id, request, record)
+
+
+@router.post("/inbox/{item_id}/decision")
+async def decide(
+    item_id: uuid.UUID, body: Decision, tenant_id: TenantId, request: Request
+) -> AnswerResult:
+    """Approve or reject a request such as publishing the website (nothing is public before)."""
+
+    async def record(item: InboxItem) -> str:
+        if item.kind != "approval":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Use /answer for questions.")
+        if body.approve:
+            return APPROVE
+        return f"Rejected by the admin. Feedback: {body.feedback or 'none given'}"
+
+    return await _settle(item_id, tenant_id, request, record)
+
+
+async def _settle(
+    item_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    request: Request,
+    record: Callable[[InboxItem], Awaitable[str]],
+) -> AnswerResult:
+    """Record one reply; once the run has nothing open left, resume it exactly once."""
     async with tenant_transaction(request.app.state.db, tenant_id) as conn:
         session = AsyncSession(bind=conn, expire_on_commit=False)
         item = await session.get(InboxItem, item_id)  # RLS: other tenants' items -> None
         if item is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found.")
-        # Lock the run: answers to two questions of one run arriving together must not
-        # both see "another question still open" and leave the run waiting forever.
+        # Lock the run: replies to two items of one run arriving together must not both
+        # see "another item still open" and leave the run waiting forever.
         run = await session.get(Run, item.run_id, with_for_update=True)
         await session.refresh(item)
         if item.status != "open" or run is None or run.status != "waiting":
-            raise HTTPException(status.HTTP_409_CONFLICT, "This question was already answered.")
+            raise HTTPException(status.HTTP_409_CONFLICT, "This was already answered.")
 
-        if item.secret_name:
-            store = request.app.state.secrets
-            if store is None:
-                raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Secret store not set up.")
-            # The value goes to OpenBao only (ADR-0009); this table and the employee get
-            # the name. If the commit below fails, a retry simply overwrites the value.
-            await store.put(tenant_id, item.secret_name, body.answer)
-            recorded = (
-                f"Stored securely as {item.secret_name}. Your commands can read it from the "
-                f"environment variable {item.secret_name}."
-            )
-        else:
-            recorded = body.answer
-        item.status, item.answer, item.answered_at = "answered", recorded, datetime.now(UTC)
+        item.answer = await record(item)
+        item.status, item.answered_at = "answered", datetime.now(UTC)
         await session.flush()
 
         still_open = await session.scalar(
@@ -104,6 +144,8 @@ def _out(item: InboxItem) -> InboxItemOut:
         employee=item.employee,
         question=item.question,
         secret_name=item.secret_name,
+        kind=item.kind,
+        preview_url=item.preview_url,
         status=item.status,
         created_at=item.created_at,
     )

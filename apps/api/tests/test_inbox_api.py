@@ -119,3 +119,60 @@ def test_secret_questions_need_a_secret_store(client: TestClient) -> None:
 def _owner_url(settings: Settings) -> str:
     host, port = settings.postgres_host, settings.postgres_port
     return f"postgresql+psycopg://test:test@{host}:{port}/{settings.postgres_db}"
+
+
+def _waiting_item(api_settings: Settings, tenant_id: uuid.UUID, kind: str) -> str:
+    """An open inbox item on a waiting run, inserted directly (owner role, bypasses RLS)."""
+    engine = create_engine(_owner_url(api_settings))
+    with engine.begin() as conn:
+        run_id = conn.execute(
+            text(
+                "INSERT INTO runs (tenant_id, goal, status)"
+                " VALUES (:t, 'g', 'waiting') RETURNING id"
+            ),
+            {"t": tenant_id},
+        ).scalar_one()
+        item_id = conn.execute(
+            text(
+                "INSERT INTO inbox_items (tenant_id, run_id, question_id, employee, question, kind)"
+                " VALUES (:t, :r, 'q1', 'Robin', 'Publish?', :k) RETURNING id"
+            ),
+            {"t": tenant_id, "r": run_id, "k": kind},
+        ).scalar_one()
+    engine.dispose()
+    return str(item_id)
+
+
+def test_approvals_and_questions_use_their_own_endpoints(
+    client: TestClient, api_settings: Settings
+) -> None:
+    acme = new_tenant(client, "Acme")
+    approval = _waiting_item(api_settings, acme.id, "approval")
+    question = _waiting_item(api_settings, acme.id, "question")
+
+    assert (
+        client.post(f"/inbox/{approval}/answer", json={"answer": "ok"}, headers=acme).status_code
+        == 409
+    )
+    decision = {"approve": True}
+    assert (
+        client.post(f"/inbox/{question}/decision", json=decision, headers=acme).status_code == 409
+    )
+
+    item = client.get("/inbox", headers=acme).json()
+    assert {i["kind"] for i in item} == {"approval", "question"}
+
+
+def test_a_rejection_records_the_feedback(client: TestClient, api_settings: Settings) -> None:
+    acme = new_tenant(client, "Acme")
+    approval = _waiting_item(api_settings, acme.id, "approval")
+    decision = {"approve": False, "feedback": "make it warmer"}
+    result = client.post(f"/inbox/{approval}/decision", json=decision, headers=acme)
+    assert result.status_code == 200
+    engine = create_engine(_owner_url(api_settings))
+    with engine.connect() as conn:
+        answer = conn.execute(
+            text("SELECT answer FROM inbox_items WHERE id = :i"), {"i": approval}
+        ).scalar_one()
+    engine.dispose()
+    assert answer == "Rejected by the admin. Feedback: make it warmer"

@@ -100,6 +100,8 @@ class InboxItem(Base):
     # Set when the employee needs a credential: the answer goes to the secret store
     # under this name (ADR-0009) and is never written to this table.
     secret_name: Mapped[str | None] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(20), server_default="question")  # | approval
+    preview_url: Mapped[str | None] = mapped_column(Text)  # approval: the site to review
     status: Mapped[str] = mapped_column(String(20), server_default="open")  # open | answered
     # Plain answers only; for secrets this holds "stored as NAME", never the value.
     answer: Mapped[str | None] = mapped_column(Text)

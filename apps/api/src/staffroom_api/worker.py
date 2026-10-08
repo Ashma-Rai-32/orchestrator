@@ -6,6 +6,7 @@ The API only enqueues (`run_segment.kiq(...)`); the work happens here.
 
 import uuid
 from functools import partial
+from pathlib import Path
 
 from redis.asyncio import Redis
 from sqlalchemy import select
@@ -13,11 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from taskiq import AsyncBroker, Context, InMemoryBroker, TaskiqDepends, TaskiqEvents, TaskiqState
 
 from staffroom_api.agents.checkpoints import run_checkpointer
+from staffroom_api.agents.deploy import SiteHost, site_slug
 from staffroom_api.agents.models import chat_model
-from staffroom_api.agents.team import EmployeeSpec, build_team, toolsets_needed
+from staffroom_api.agents.team import EmployeeSpec, Publishing, build_team, toolsets_needed
 from staffroom_api.agents.toolsets import open_toolsets
 from staffroom_api.broker import ReclaimingRedisStreamBroker
-from staffroom_api.db.models import Employee, Run
+from staffroom_api.db.models import Employee, Run, Tenant
 from staffroom_api.db.tenancy import tenant_transaction
 from staffroom_api.observability import init_tracing, shutdown_tracing
 from staffroom_api.runs import execute_run, fail_run
@@ -75,6 +77,7 @@ async def run_segment(
         run = await session.get(Run, rid)
         if run is None or run.status in ("succeeded", "failed"):
             return  # idempotent: a redelivered message for a finished run does nothing
+        tenant = await session.get(Tenant, tid)
         employees = [
             EmployeeSpec(name=e.name, skills=e.skills)
             for e in await session.scalars(select(Employee))
@@ -98,6 +101,7 @@ async def run_segment(
                 checkpointer=checkpointer,
                 sandbox=sandbox,
                 toolsets=toolsets,
+                publishing=_publishing(s, tenant.name if tenant else str(tid)),
             )
             await execute_run(db, redis, tid, rid, team, goal, answers)
     except Exception as exc:
@@ -112,3 +116,11 @@ async def _tenant_secrets(settings: Settings, tenant_id: uuid.UUID) -> dict[str,
         return {}
     store = OpenBaoSecretStore(settings.openbao_url, settings.openbao_token.get_secret_value())
     return await load_all(store, tenant_id)
+
+
+def _publishing(settings: Settings, tenant_name: str) -> Publishing | None:
+    """Approved sites go to <sites_dir>/sites/<tenant>/ (M6.3); off when unconfigured."""
+    if settings.sites_dir is None:
+        return None
+    host = SiteHost(Path(settings.sites_dir), settings.sites_public_url)
+    return Publishing(sites=host, slug=site_slug(tenant_name))

@@ -29,6 +29,7 @@ from langgraph.errors import GraphBubbleUp
 from langgraph.prebuilt import ToolRuntime
 from langgraph.types import Command, interrupt
 
+from staffroom_api.agents.deploy import SiteHost, deploy_tool
 from staffroom_api.agents.events import (
     InputNeeded,
     RunFinished,
@@ -63,6 +64,14 @@ WORKSPACE_PROMPT = (
     "http://localhost:4173/ (so /workspace/site/index.html is http://localhost:4173/site/index.html)."
 )
 MAX_MODEL_CALLS_PER_RUN = 20  # runaway guard per agent run
+
+
+@dataclass(frozen=True)
+class Publishing:
+    """Where approved sites go (M6.3): the static host and this tenant's site name."""
+
+    sites: SiteHost
+    slug: str
 
 
 @dataclass(frozen=True)
@@ -115,10 +124,13 @@ class _LangGraphTeam:
         sandbox: SandboxBackendProtocol | None,
         toolsets: Mapping[str, list[BaseTool]],
         fallbacks: FallbacksFactory,
+        publishing: Publishing | None,
     ) -> None:
         durable = checkpointer is not None
         agents = {
-            e.name: self._employee_agent(e, model(), sandbox, toolsets, fallbacks, durable)
+            e.name: self._employee_agent(
+                e, model(), sandbox, toolsets, fallbacks, durable, publishing
+            )
             for e in employees
         }
 
@@ -146,8 +158,15 @@ class _LangGraphTeam:
         toolsets: Mapping[str, list[BaseTool]],
         fallbacks: FallbacksFactory,
         durable: bool,
+        publishing: Publishing | None,
     ) -> Any:
         profile = merge_skills(e.skills)
+        # Deploying needs a workspace and a durable run (it pauses for the admin's approval).
+        publish_tools = (
+            [deploy_tool(e.name, sandbox, publishing.sites, publishing.slug)]
+            if publishing is not None and sandbox is not None and durable
+            else []
+        )
         # Skill-specific tools, e.g. the browser for `testing` (catalog.toml `tools`).
         skill_tools = [tool for name in profile.tools for tool in toolsets.get(name, [])]
         middleware: list[Any] = [
@@ -160,7 +179,7 @@ class _LangGraphTeam:
             middleware.append(FilesystemMiddleware(backend=sandbox))
         return create_agent(
             model,
-            tools=[*skill_tools, _ask_admin_tool(e.name)],
+            tools=[*skill_tools, _ask_admin_tool(e.name), *publish_tools],
             system_prompt=employee_prompt(profile.system_prompt, sandbox is not None),
             middleware=middleware,
             name=e.name,
@@ -220,6 +239,8 @@ class _LangGraphTeam:
                         employee=question.value["employee"],
                         question=question.value["question"],
                         secret_name=question.value.get("secret_name"),
+                        kind=question.value.get("kind", "question"),
+                        preview_url=question.value.get("preview_url"),
                     )
                 yield RunWaiting(open_questions=len(pending))
                 return
@@ -335,10 +356,13 @@ def build_team(
     sandbox: SandboxBackendProtocol | None = None,
     toolsets: Mapping[str, list[BaseTool]] | None = None,
     fallbacks: FallbacksFactory = list,
+    publishing: Publishing | None = None,
 ) -> _LangGraphTeam:
     if not employees:
         raise ValueError("a team needs at least one employee")
-    return _LangGraphTeam(employees, model, checkpointer, sandbox, toolsets or {}, fallbacks)
+    return _LangGraphTeam(
+        employees, model, checkpointer, sandbox, toolsets or {}, fallbacks, publishing
+    )
 
 
 def employee_prompt(skills_prompt: str, has_sandbox: bool) -> str:

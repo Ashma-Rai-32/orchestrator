@@ -16,7 +16,9 @@ RUN uv sync --locked --package staffroom-api --no-install-workspace
 COPY apps/api apps/api
 RUN uv sync --locked --package staffroom-api
 
-RUN useradd --create-home app
+RUN useradd --create-home app \
+ # Owned by the app user: an empty named volume mounted here inherits this ownership.
+ && mkdir /sites && chown app:app /sites
 USER app
 
 EXPOSE 8000

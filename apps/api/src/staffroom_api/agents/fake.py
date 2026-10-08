@@ -9,6 +9,7 @@ doing what a sensible real model would (sequentially, never racing its own steps
 - employee whose task says "ASK:" -> ask the admin (interrupt), then use the answer
 - tester (browser tools)          -> open the live preview, read the page, report
 - builder (sandbox tools)         -> write a page, list the site with node, report
+                                     (task says DEPLOY: write index.html, then deploy_site)
 - no tools                        -> report the request as done
 """
 
@@ -27,6 +28,7 @@ SANDBOX_TOOLS = {"write_file", "execute"}
 ASK = "ASK:"  # test/demo trigger: "... ASK: which colours do you like?"
 CREDENTIAL_TRIGGER = "SECRET:"  # with ASK: "... ASK: I need an API key SECRET: OPENAI_API_KEY"
 BROWSER_TOOLS = {"browser_navigate", "browser_snapshot"}
+DEPLOY = "DEPLOY"  # test/demo trigger: a builder whose task says DEPLOY publishes its site
 SITE, PORT = "/workspace/site", 4173
 LIST_SITE = (
     "node -e \"const fs=require('fs');"
@@ -78,7 +80,7 @@ class RuleBasedFakeModel(BaseChatModel):
         if tools >= BROWSER_TOOLS:
             return _tester_step(request, results)
         if tools >= SANDBOX_TOOLS:
-            return _builder_step(request, results)
+            return _builder_step(request, results, DEPLOY in request and "deploy_site" in tools)
         return AIMessage(content=f"Done: {request}")
 
 
@@ -106,13 +108,17 @@ def _asking_step(request: str, results: list[str]) -> AIMessage:
     return AIMessage(content=f"Done, using the admin's answer. {results[-1]}")
 
 
-def _builder_step(request: str, results: list[str]) -> AIMessage:
+def _builder_step(request: str, results: list[str], deploy: bool) -> AIMessage:
     if not results:
-        page = f"{SITE}/{hashlib.sha256(request.encode()).hexdigest()[:8]}.html"
+        # With DEPLOY the page is the site's index.html (deploy_site requires one).
+        name = "index" if deploy else hashlib.sha256(request.encode()).hexdigest()[:8]
         html = f"<html><body><h1>{request}</h1></body></html>\n"
-        return _calls([("write_file", {"file_path": page, "content": html})])
+        return _calls([("write_file", {"file_path": f"{SITE}/{name}.html", "content": html})])
     if len(results) == 1:
         return _calls([("execute", {"command": LIST_SITE})])
+    if deploy and len(results) == 2:
+        summary = "a first version of the website"
+        return _calls([("deploy_site", {"summary": summary, "folder": SITE})])
     return AIMessage(content=f"Done: {request}. {results[-1].strip()}")
 
 

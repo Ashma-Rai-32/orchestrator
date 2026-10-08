@@ -1,0 +1,15 @@
+# Static host for M6.3 (deploy with approval). Serves the shared `sites` volume:
+#   /previews/<token>/  private previews awaiting approval (unguessable token)
+#   /sites/<company>/   published sites (only after the admin approved)
+:80 {
+	root * /srv
+	# No directory listings: /previews/ must not reveal other tokens.
+	file_server
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+	}
+	@previews path /previews/*
+	header @previews X-Robots-Tag "noindex, nofollow"
+}

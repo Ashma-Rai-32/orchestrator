@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     openbao_url: str = "http://localhost:8200"
     openbao_token: SecretStr | None = None
 
+    # Deploy with approval (M6.3): shared folder served by the static host. Off if unset.
+    sites_dir: str | None = None
+    sites_public_url: str = "http://localhost:8090"
+
     # Task queue (ADR-0004). "memory" runs tasks inline (tests).
     task_broker: Literal["redis", "memory"] = "redis"
     # A run segment must finish before its message can be re-claimed by another worker.

@@ -48,6 +48,8 @@ class InputNeeded(BaseModel):
     employee: str
     question: str
     secret_name: str | None = None  # a credential: the answer goes to the secret store
+    kind: Literal["question", "approval"] = "question"  # approval: approve/reject a deploy
+    preview_url: str | None = None  # approval: what the admin is asked to approve
 
 
 class RunWaiting(BaseModel):
