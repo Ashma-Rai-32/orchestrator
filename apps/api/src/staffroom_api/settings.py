@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr | None = None
     langfuse_base_url: str = "http://localhost:3000"
 
+    # Tenant secrets in OpenBao (ADR-0009). Off unless a token is set.
+    openbao_url: str = "http://localhost:8200"
+    openbao_token: SecretStr | None = None
+
     # Task queue (ADR-0004). "memory" runs tasks inline (tests).
     task_broker: Literal["redis", "memory"] = "redis"
     # A run segment must finish before its message can be re-claimed by another worker.

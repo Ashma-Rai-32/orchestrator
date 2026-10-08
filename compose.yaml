@@ -47,6 +47,8 @@ services:
       # App role only: not the table owner, so row-level security applies.
       APP_DB_USER: ${APP_DB_USER:-staffroom_app}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:-staffroom_app}
+      OPENBAO_URL: http://openbao:8200
+      OPENBAO_TOKEN: ${OPENBAO_DEV_TOKEN:-staffroom-dev-root}
       # "fake:1" = deterministic fake model, 1 s per reply, so runs are watchable.
       STAFFROOM_MODEL: ${STAFFROOM_MODEL:-fake:1}
       # Tokens say iss=localhost:8080 (KC_HOSTNAME); keys are fetched over the compose network.
@@ -87,6 +89,8 @@ services:
       SANDBOX_BACKEND: ${SANDBOX_BACKEND:-docker}
       SANDBOX_IMAGE: staffroom-sandbox:dev
       DOCKER_HOST: tcp://docker-proxy:2375
+      OPENBAO_URL: http://openbao:8200
+      OPENBAO_TOKEN: ${OPENBAO_DEV_TOKEN:-staffroom-dev-root}
       # Tracing (ADR-0008): on when keys are set (.env); needs --profile observability.
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
@@ -155,6 +159,20 @@ services:
       timeout: 5s
       retries: 30
       start_period: 20s
+
+  # Tenant secrets (ADR-0009). DEV MODE: in-memory and unsealed, so secrets vanish when
+  # it restarts and the root token is a fixed dev value. Never run like this in production.
+  openbao:
+    image: openbao/openbao:2.7.1
+    command: ["server", "-dev", "-dev-root-token-id=${OPENBAO_DEV_TOKEN:-staffroom-dev-root}", "-dev-listen-address=0.0.0.0:8200"]
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:${OPENBAO_PORT:-8200}:8200
+    healthcheck:
+      test: ["CMD", "bao", "status", "-address=http://127.0.0.1:8200"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 
   postgres:
     image: docker.io/postgres:17-alpine
