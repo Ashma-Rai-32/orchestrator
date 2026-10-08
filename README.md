@@ -79,7 +79,9 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 | Tracing: Langfuse (M4) | Real | One trace per run (session = run, user = tenant), every model/tool call nested; secrets masked before export ([ADR-0008](docs/adr/0008-observability-langfuse.md)). Needs `--profile observability` |
 | Real model end-to-end run (M4) | Planned | |
 | Durability across restarts / logout (M5) | Planned | |
-| Deploy with admin approval (M6) | Planned | |
+| Admin inbox (M6.1) | Real | Employees ask via `ask_admin` (LangGraph interrupt); run waits without holding a worker; answer in the office to resume |
+| Secret store (M6.2) | Planned | Answers are plain text until then |
+| Deploy with admin approval (M6.3) | Planned | |
 | Research harness (M7) | Planned | |
 
 Plan and progress: [docs/plans/](docs/plans/). Decisions: [docs/adr/](docs/adr/). Framework findings: [docs/frameworks/](docs/frameworks/).

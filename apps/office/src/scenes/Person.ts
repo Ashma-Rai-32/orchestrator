@@ -19,10 +19,14 @@ const BUBBLE: Phaser.Types.GameObjects.Text.TextStyle = {
   wordWrap: { width: 90 },
 }
 
-/** A character in the office: sprite + name label + speech bubble, moved by tweens. */
+/**
+ * A character in the office: sprite + name label + speech bubble in one Phaser Container,
+ * so all three always move together. (Bug fixed: a tween *chain*'s onUpdate does not fire
+ * per step in Phaser 4, so separately positioned labels stayed behind at the desk.)
+ */
 export class Person {
+  private readonly body: Phaser.GameObjects.Container
   private readonly sprite: Phaser.GameObjects.Sprite
-  private readonly label: Phaser.GameObjects.Text
   private readonly bubble: Phaser.GameObjects.Text
   private readonly home: { x: number; y: number }
   private readonly scene: Phaser.Scene
@@ -30,26 +34,24 @@ export class Person {
   constructor(scene: Phaser.Scene, name: string, x: number, y: number, tint: number) {
     this.scene = scene
     this.home = { x, y }
-    this.sprite = scene.add.sprite(x, y, 'character', 0).setTint(tint).setDepth(y)
-    this.label = scene.add.text(x, y + 9, name, LABEL).setOrigin(0.5, 0).setResolution(4).setDepth(1000)
-    this.bubble = scene.add
-      .text(x, y - 10, '', BUBBLE)
-      .setOrigin(0.5, 1)
-      .setResolution(4)
-      .setDepth(2000)
-      .setVisible(false)
+    this.sprite = scene.add.sprite(0, 0, 'character', 0).setTint(tint)
+    const label = scene.add.text(0, 9, name, LABEL).setOrigin(0.5, 0).setResolution(4)
+    this.bubble = scene.add.text(0, -10, '', BUBBLE).setOrigin(0.5, 1).setResolution(4).setVisible(false)
+    this.body = scene.add.container(x, y, [this.sprite, label, this.bubble]).setDepth(y)
   }
 
   /** Say something above the head; empty text hides the bubble. */
   say(text: string): void {
     this.bubble.setText(shorten(text, 80)).setVisible(text.length > 0)
+    // A speaking character comes to the front so the bubble is never hidden.
+    this.body.setDepth(text ? 10_000 + this.body.y : this.body.y)
   }
 
-  /** Walk to (x, y), then to each next point, then call `done`. Straight lines, no pathfinding yet. */
+  /** Walk through `points`, then call `done`. Straight lines, no pathfinding yet. */
   walk(points: { x: number; y: number }[], done?: () => void): void {
-    this.scene.tweens.killTweensOf([this.sprite, this.label, this.bubble])
+    this.scene.tweens.killTweensOf(this.body)
     const legs = []
-    let from = { x: this.sprite.x, y: this.sprite.y }
+    let from = { x: this.body.x, y: this.body.y }
     for (const to of points) {
       const duration = (Phaser.Math.Distance.BetweenPoints(from, to) / WALK_PIXELS_PER_SECOND) * 1000
       legs.push({ x: to.x, y: to.y, duration, ease: 'Linear' })
@@ -57,12 +59,11 @@ export class Person {
     }
     this.sprite.play('walk')
     this.scene.tweens.chain({
-      targets: this.sprite,
+      targets: this.body,
       tweens: legs,
-      onUpdate: () => this.follow(),
       onComplete: () => {
         this.sprite.stop().setFrame(0)
-        this.follow()
+        if (!this.bubble.visible) this.body.setDepth(this.body.y) // lower on screen = in front
         done?.()
       },
     })
@@ -70,14 +71,6 @@ export class Person {
 
   goHome(done?: () => void): void {
     this.walk([this.home], done)
-  }
-
-  /** Label and bubble track the sprite; depth sorts characters by y (who is in front). */
-  private follow(): void {
-    const { x, y } = this.sprite
-    this.sprite.setDepth(y)
-    this.label.setPosition(x, y + 9)
-    this.bubble.setPosition(x, y - 10)
   }
 }
 

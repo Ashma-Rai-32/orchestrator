@@ -14,6 +14,8 @@ export class OfficeScene extends Phaser.Scene {
   // Not `data`: Phaser.Scene already has a `data` (its DataManager).
   private readonly office: OfficeData
   private readonly people = new Map<string, Person>()
+  /** Employees waiting on the admin: the question stays up until the run resumes. */
+  private readonly waiting = new Map<string, string>()
   private coordinator?: Person
   private huddle = { x: 0, y: 0 }
   private ready?: () => void
@@ -78,6 +80,8 @@ export class OfficeScene extends Phaser.Scene {
         break
       case 'run_resumed':
         boss?.say('Picking up where we left off')
+        for (const name of this.waiting.keys()) this.people.get(name)?.say('Thanks!')
+        this.waiting.clear()
         break
       case 'task_assigned': {
         boss?.say(`${event.employee}, please take this one`)
@@ -86,13 +90,22 @@ export class OfficeScene extends Phaser.Scene {
         const briefing = { x: this.huddle.x + Phaser.Math.Between(-24, 24), y: this.huddle.y + 12 }
         person?.say('')
         person?.walk([briefing], () => {
-          person.say(`Working on: ${event.task}`)
+          // The question may have arrived while walking: don't hide it.
+          const question = this.waiting.get(event.employee)
+          person.say(question ? `? ${question}` : `Working on: ${event.task}`)
           person.goHome()
         })
         break
       }
       case 'task_finished':
         this.people.get(event.employee)?.say('✓ Done')
+        break
+      case 'input_needed':
+        this.waiting.set(event.employee, event.question)
+        this.people.get(event.employee)?.say(`? ${event.question}`)
+        break
+      case 'run_waiting':
+        boss?.say('Waiting for your answer: check the inbox')
         break
       case 'task_failed':
         this.people.get(event.employee)?.say(`✗ Couldn't finish (${event.error})`)

@@ -16,6 +16,10 @@
       <input id="goal" name="goal" placeholder="What should your team build? e.g. an LLM wrapper website" required maxlength="2000" />
       <button type="submit">Start</button>
     </form>
+    <section id="inbox" hidden>
+      <h2>Inbox</h2>
+      <ul id="inbox-items"></ul>
+    </section>
     <div id="office"></div>
     <p id="status" role="status"></p>
     <script type="module" src="/src/main.ts"></script>

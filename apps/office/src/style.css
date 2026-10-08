@@ -65,3 +65,44 @@ button {
   color: #9aa3b5;
   white-space: pre-wrap;
 }
+
+#inbox {
+  max-width: 960px;
+  border: 1px solid #f0b429;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #2a2618;
+}
+
+#inbox h2 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: #f0b429;
+}
+
+#inbox-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+#inbox-items p {
+  margin: 0 0 4px;
+}
+
+#inbox-items form {
+  display: flex;
+  gap: 8px;
+}
+
+#inbox-items input {
+  flex: 1;
+  font: inherit;
+  color: inherit;
+  background: #2c313d;
+  border: 1px solid #454c5a;
+  border-radius: 6px;
+  padding: 4px 8px;
+}

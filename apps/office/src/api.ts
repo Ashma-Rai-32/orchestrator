@@ -5,6 +5,7 @@ const API = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
 export type Me = { user_id: string; tenant_id: string; tenant_name: string }
 export type Employee = { id: string; name: string; skills: string[]; created_at: string }
+export type InboxItem = { id: string; run_id: string; employee: string; question: string }
 export type Run = { id: string; goal: string; status: string; summary: string | null }
 
 /** Mirrors staffroom_api.agents.events (a discriminated union on `type`). */
@@ -14,6 +15,8 @@ export type RunEvent =
   | { type: 'task_assigned'; employee: string; task: string }
   | { type: 'task_finished'; employee: string; result: string }
   | { type: 'task_failed'; employee: string; error: string }
+  | { type: 'input_needed'; question_id: string; employee: string; question: string }
+  | { type: 'run_waiting'; open_questions: number }
   | { type: 'run_finished'; summary: string }
   | { type: 'run_failed'; error: string }
 
@@ -48,5 +51,8 @@ export const api = {
   me: () => call<Me>('GET', '/me'),
   employees: () => call<Employee[]>('GET', '/employees'),
   startRun: (goal: string) => call<Run>('POST', '/goals', { goal }),
+  inbox: () => call<InboxItem[]>('GET', '/inbox'),
+  answer: (itemId: string, answer: string) =>
+    call<{ run_resumed: boolean }>('POST', `/inbox/${itemId}/answer`, { answer }),
   followRun,
 }
