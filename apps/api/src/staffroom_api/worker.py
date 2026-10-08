@@ -22,6 +22,7 @@ from staffroom_api.db.tenancy import tenant_transaction
 from staffroom_api.observability import init_tracing, shutdown_tracing
 from staffroom_api.runs import execute_run, fail_run
 from staffroom_api.sandbox import run_sandbox
+from staffroom_api.secrets import OpenBaoSecretStore, load_all
 from staffroom_api.settings import Settings
 
 settings = Settings()
@@ -85,7 +86,7 @@ async def run_segment(
     try:
         async with (
             run_checkpointer(s, tid) as checkpointer,
-            run_sandbox(s, tid, rid) as sandbox,
+            run_sandbox(s, tid, rid, await _tenant_secrets(s, tid)) as sandbox,
             open_toolsets(toolsets_needed(employees), sandbox) as toolsets,
         ):
             team = build_team(
@@ -103,3 +104,11 @@ async def run_segment(
         # Setup failed (sandbox, browser, model config...): fail visibly. Found when a
         # misconfigured fallback model left runs stuck in `queued` forever.
         await fail_run(db, redis, tid, rid, exc)
+
+
+async def _tenant_secrets(settings: Settings, tenant_id: uuid.UUID) -> dict[str, str]:
+    """Loaded per segment, so a key the admin just added is available on resume."""
+    if settings.openbao_token is None:
+        return {}
+    store = OpenBaoSecretStore(settings.openbao_url, settings.openbao_token.get_secret_value())
+    return await load_all(store, tenant_id)

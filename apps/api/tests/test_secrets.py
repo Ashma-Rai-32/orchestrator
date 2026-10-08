@@ -62,3 +62,11 @@ async def test_overwriting_keeps_the_latest_value(store: OpenBaoSecretStore) -> 
 async def test_names_must_be_env_var_style(store: OpenBaoSecretStore, bad: str) -> None:
     with pytest.raises(InvalidSecretName):
         await store.put(uuid.uuid4(), bad, "x")
+
+
+def test_mask_replaces_values_with_their_names() -> None:
+    from staffroom_api.secrets import mask
+
+    secrets = {"OPENAI_API_KEY": "sk-abc123456", "SHORT": "ab"}
+    text = "using sk-abc123456 now; ab stays"  # values under 4 chars are not masked
+    assert mask(text, secrets) == "using [secret:OPENAI_API_KEY] now; ab stays"

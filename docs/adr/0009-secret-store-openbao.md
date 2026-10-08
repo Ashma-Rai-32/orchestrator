@@ -38,6 +38,13 @@ Option 2, behind a `SecretStore` Protocol (`staffroom_api/secrets.py`).
 - Bad: `hvac` is slow-moving (one release in two years); the Vault HTTP API it wraps is stable.
 - Follow-ups (production): non-dev OpenBao with storage + auto-unseal, AppRole auth with per-service policies (API: write, worker: read) instead of a root token; enable an audit device.
 
+## Update 2026-10-08: using secrets in the sandbox (M6.2c)
+
+- At the start of each run segment the worker loads the tenant's secrets from OpenBao (worker memory only), so a key added in the inbox is available right after resume.
+- Every sandbox command receives them as environment variables through Docker exec's per-command `environment` (not the container config, so `docker inspect` does not show them).
+- Command output and downloaded text files have secret values replaced with `[secret:NAME]` before the model sees them (`secrets.mask`).
+- **Limits (second layer only):** masking matches the literal value. A command that transforms it (base64, reversing, splitting) is not caught, and the browser tools' page snapshots are not masked (a page that prints a key would show it). The first layer is that agents never receive values; per-employee secret scoping and egress controls are follow-ups.
+
 ## Sources
 
 - GitHub: openbao/openbao v2.7.1, hashicorp/vault LICENSE (BSL), Infisical/infisical; PyPI: hvac 2.4.0, cryptography 50.0.2 (2026-10-08).

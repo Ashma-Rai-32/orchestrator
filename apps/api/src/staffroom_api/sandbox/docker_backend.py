@@ -4,11 +4,13 @@ Isolation is entirely Docker configuration (see `_HARDENING`); this module only
 maps deepagents' four primitives onto the Docker API. Production uses E2B.
 """
 
+import contextlib
 import io
 import shlex
 import tarfile
 import time
 import uuid
+from collections.abc import Mapping
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -20,6 +22,8 @@ from deepagents.backends.protocol import (
 )
 from deepagents.backends.sandbox import BaseSandbox
 from docker.errors import NotFound
+
+from staffroom_api.secrets import mask
 
 WORKSPACE = "/workspace"
 _GO_MODE_DIR = 1 << 31  # Docker's stat `mode` is Go's os.FileMode
@@ -50,8 +54,11 @@ class DockerSandbox(BaseSandbox):
         image: str,
         runtime: str | None = None,
         client: docker.DockerClient | None = None,
+        secrets: Mapping[str, str] | None = None,
     ) -> None:
         self._docker = client or docker.from_env()
+        # Tenant secrets (ADR-0009): env vars for each command, masked in what comes back.
+        self._secrets = dict(secrets or {})
         self._name = f"staffroom-sbx-{run_id}"
         self._volume = f"staffroom-ws-{run_id}"
         self._container = self._attach_or_create(tenant_id, run_id, image, runtime)
@@ -87,8 +94,12 @@ class DockerSandbox(BaseSandbox):
         seconds = timeout or DEFAULT_TIMEOUT_SECONDS
         # coreutils `timeout` inside the sandbox enforces the limit (exit code 124).
         wrapped = ["timeout", "--kill-after=5", str(seconds), "sh", "-c", command]
-        result = self._container.exec_run(wrapped, workdir=WORKSPACE, demux=False)
-        output = (result.output or b"").decode("utf-8", errors="replace")
+        # Secrets go in per command (Docker exec `environment`), never into the container
+        # config, so `docker inspect` of the sandbox does not reveal them.
+        result = self._container.exec_run(
+            wrapped, workdir=WORKSPACE, demux=False, environment=self._secrets
+        )
+        output = mask((result.output or b"").decode("utf-8", errors="replace"), self._secrets)
         truncated = len(output) > MAX_OUTPUT_CHARS
         return ExecuteResponse(
             output=output[:MAX_OUTPUT_CHARS], exit_code=result.exit_code, truncated=truncated
@@ -126,6 +137,10 @@ class DockerSandbox(BaseSandbox):
             with tarfile.open(fileobj=io.BytesIO(b"".join(stream))) as tar:
                 member = tar.extractfile(tar.getmembers()[0])
                 content = member.read() if member else None
+            if content is not None and self._secrets:
+                # Text files: mask secret values, as for command output. Binary: left as is.
+                with contextlib.suppress(UnicodeDecodeError):
+                    content = mask(content.decode("utf-8"), self._secrets).encode("utf-8")
             responses.append(FileDownloadResponse(path=path, content=content))
         return responses
 

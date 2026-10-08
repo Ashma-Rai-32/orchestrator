@@ -29,7 +29,8 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [x] M6.1 inbox: `ask_admin` tool → LangGraph interrupt; employees inherit the checkpointer (experiment: with False the answer never arrived); run status `waiting`; `inbox_items` (RLS); `GET /inbox`, `POST /inbox/{id}/answer` resumes once all questions are answered; office inbox panel + "?" bubbles. Verified in a real browser.
 - Fixed on the way: GraphInterrupt swallowed by the failed-task handler (re-raise GraphBubbleUp); runs stuck `queued` on setup errors; Alembic autogenerate wanted to DROP the checkpoint tables (include_object filter + test); labels not following walking characters (Phaser Container).
 - [x] M6.2a/b: OpenBao secret store (ADR-0009, dev mode in compose); `ask_admin(secret_name=...)`; inbox password field; value goes to OpenBao only. Verified live: value in OpenBao, 0 occurrences in a full Postgres dump and in Redis streams.
-- [ ] **Next: M6.2c** inject tenant secrets into sandbox commands as env vars + mask their values in command output. Then 6.3 deploy with approval, then M7 evals.
+- [x] M6.2c: tenant secrets as per-command env vars in the sandbox; values masked in command output and downloads (limits in ADR-0009).
+- [ ] **Next: M6.3 deploy with approval** (preview → admin approves → publish), then M7 evals.
 - Office polish backlog adds: overlapping bubbles at the huddle.
 - [ ] Secrets: inbox form → secret store; agents get secret names only (also covers secrets typed into goals).
 - [ ] Office polish backlog (deferred by maintainer, 2026-10-07: "do it later"): real CC0 art (Kenney; isometric option), pathfinding, character variants, inbox panel, hire UI. Decision: stay 2D; no 3D.

@@ -2,7 +2,7 @@
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 
 from deepagents.backends.protocol import SandboxBackendProtocol
@@ -12,7 +12,10 @@ from staffroom_api.settings import Settings
 
 @asynccontextmanager
 async def run_sandbox(
-    settings: Settings, tenant_id: uuid.UUID, run_id: uuid.UUID
+    settings: Settings,
+    tenant_id: uuid.UUID,
+    run_id: uuid.UUID,
+    secrets: Mapping[str, str] | None = None,
 ) -> AsyncIterator[SandboxBackendProtocol | None]:
     """The run's sandbox, or None when sandboxing is off (tools are then not offered).
 
@@ -33,6 +36,7 @@ async def run_sandbox(
         run_id,
         image=settings.sandbox_image,
         runtime=settings.sandbox_runtime,
+        secrets=secrets,
     )
     try:
         yield sandbox

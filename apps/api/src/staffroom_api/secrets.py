@@ -7,6 +7,7 @@ implementation (OpenBao KV v2 through `hvac`, which speaks the Vault API).
 import asyncio
 import re
 import uuid
+from collections.abc import Mapping
 from typing import Protocol
 
 import hvac
@@ -75,3 +76,27 @@ class OpenBaoSecretStore:
         except InvalidPath:  # nothing stored for this tenant yet
             return []
         return sorted(response["data"]["keys"])
+
+
+MIN_MASKED_LENGTH = 4  # shorter values would mask ordinary text
+
+
+def mask(text: str, secrets: Mapping[str, str]) -> str:
+    """Replace each secret *value* in `text` with `[secret:NAME]`.
+
+    Second layer only: it catches the literal value (e.g. `echo $KEY`), not transformed
+    copies (base64, reversed...). The first layer is that agents never receive values.
+    """
+    for name, value in sorted(secrets.items(), key=lambda item: -len(item[1])):
+        if len(value) >= MIN_MASKED_LENGTH:
+            text = text.replace(value, f"[secret:{name}]")
+    return text
+
+
+async def load_all(store: SecretStore, tenant_id: uuid.UUID) -> dict[str, str]:
+    """Every secret of a tenant, for one run segment (held in worker memory only)."""
+    values = {}
+    for name in await store.names(tenant_id):
+        if (value := await store.get(tenant_id, name)) is not None:
+            values[name] = value
+    return values

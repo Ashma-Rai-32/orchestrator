@@ -85,3 +85,24 @@ async def test_employees_use_the_sandbox_during_a_run(sandbox: DockerSandbox) ->
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+def test_commands_get_secrets_as_env_vars_but_never_see_their_values(run_id: uuid.UUID) -> None:
+    secret = "sk-test-0123456789abcdefSANDBOX"
+    sandbox = DockerSandbox(uuid.uuid4(), run_id, image=IMAGE, secrets={"OPENAI_API_KEY": secret})
+    # The command really has the value (code like process.env.OPENAI_API_KEY works)...
+    length = sandbox.execute('node -e "console.log(process.env.OPENAI_API_KEY.length)"')
+    assert length.output.strip() == str(len(secret))
+    # ...but whatever comes back to the model has it masked.
+    echoed = sandbox.execute("echo $OPENAI_API_KEY")
+    assert secret not in echoed.output
+    assert echoed.output.strip() == "[secret:OPENAI_API_KEY]"
+    # Also when a command writes it to a file and the model reads the file.
+    sandbox.execute('echo "key=$OPENAI_API_KEY" > /workspace/.env.local')
+    assert secret not in str(sandbox.read("/workspace/.env.local"))
+    assert (
+        secret not in (sandbox.download_files(["/workspace/.env.local"])[0].content or b"").decode()
+    )
+    # And the value is not in the container's config (exec-time only).
+    config = docker.from_env().containers.get(sandbox.id).attrs["Config"]["Env"]
+    assert not any(secret in item for item in config)
