@@ -17,6 +17,19 @@ def has_index(*, output: dict[str, Any], **_: Any) -> Evaluation:
     return Evaluation(name="has_index", value=output["index_html"] is not None)
 
 
+def site_loads(*, output: dict[str, Any], **_: Any) -> Evaluation:
+    """Opened in Chromium: no HTTP error and no console errors."""
+    site = output["site"]
+    if site is None:
+        return Evaluation(name="site_loads", value=False, comment="no index.html")
+    problems = ([site["http_error"]] if site["http_error"] else []) + site["errors"]
+    return Evaluation(
+        name="site_loads",
+        value=not problems,
+        comment=f"{site['url']}: " + ("; ".join(problems) or "ok"),
+    )
+
+
 def brief_coverage(*, output: dict[str, Any], expected_output: list[str], **_: Any) -> Evaluation:
     """Share of the brief's expected words that appear in the page's visible text."""
     html = output["index_html"] or ""
@@ -54,5 +67,7 @@ def averages(*, item_results: list[Any], **_: Any) -> list[Evaluation]:
 
 # Typed as Langfuse's protocols: the functions take the keywords they need plus **_,
 # which mypy cannot match structurally against the protocols' full signatures.
-ITEM_EVALUATORS = cast(list[EvaluatorFunction], [finished, has_index, brief_coverage, effort])
+ITEM_EVALUATORS = cast(
+    list[EvaluatorFunction], [finished, has_index, site_loads, brief_coverage, effort]
+)
 RUN_EVALUATORS = cast(list[RunEvaluatorFunction], [averages])

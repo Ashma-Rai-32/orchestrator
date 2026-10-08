@@ -25,6 +25,7 @@ from staffroom_api.agents.models import chat_model
 from staffroom_api.agents.team import EmployeeSpec, build_team, toolsets_needed
 from staffroom_api.agents.toolsets import open_toolsets
 from staffroom_api.sandbox.docker_backend import DockerSandbox
+from staffroom_experiments.site_check import check_site
 
 HERE = Path(__file__).parent
 SITE_ENTRY_POINTS = ("/workspace/site/index.html", "/workspace/index.html")
@@ -92,8 +93,21 @@ async def run_brief(config: Config, goal: str, image: str, tracing: bool) -> dic
             ]
             seconds = time.monotonic() - started
         found = await asyncio.to_thread(sandbox.download_files, list(SITE_ENTRY_POINTS))
-        index_html = next((f.content.decode("utf-8", "replace") for f in found if f.content), None)
+        entry = next((f for f in found if f.content), None)
+        index_html = entry.content.decode("utf-8", "replace") if entry and entry.content else None
+        site = None
+        if entry:
+            # /workspace/site/index.html is served at /site/, /workspace/index.html at /.
+            site = await check_site(
+                sandbox.id, entry.path.removeprefix("/workspace").removesuffix("index.html")
+            )
     finally:
         await asyncio.to_thread(sandbox.close, keep_workspace=False)
     summary = events[-1].get("summary", "") if events else ""
-    return {"events": events, "summary": summary, "index_html": index_html, "seconds": seconds}
+    return {
+        "events": events,
+        "summary": summary,
+        "index_html": index_html,
+        "site": site,
+        "seconds": seconds,
+    }
