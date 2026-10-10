@@ -1,10 +1,10 @@
 # Status
 
-_Last updated: 2026-10-07_
+_Last updated: 2026-10-10_
 
 ## Current milestone
 
-**M-1 Framework discovery**, in small increments (one concept per step, run and shown, maintainer reviews and commits).
+**M7 Research harness / evals** (7a, 7b done; 7c in progress). Small increments throughout: one concept per step, run and shown, maintainer reviews and commits.
 
 ## Next step
 
@@ -32,7 +32,11 @@ M-1 trimmed (2026-10-07, maintainer: "get to the actual implementation"). Only s
 - [x] M6.2c: tenant secrets as per-command env vars in the sandbox; values masked in command output and downloads (limits in ADR-0009).
 - [x] M6.3 deploy with approval: `deploy_site` → private preview (Caddy, unguessable token incl. thread id) → approval card in the office (preview link, Approve/Reject + feedback) → publish to /sites/<company>/ only on approve. Verified live: preview 200, public 404 before approval, 200 after.
 - [x] **M6 complete** (6.4 office inbox delivered with 6.1–6.3).
-- [ ] **Next: M7 research harness / evals** (benchmark goals × models/team configs, scored from Langfuse traces + browser checks; incl. "summary claims vs. what the trace shows" honesty metric).
+- [x] M7a: `experiments/` workspace package on Langfuse `run_experiment` (ADR-0010): benchmark briefs + team/model configs as TOML, agent system in-process with a fresh sandbox per brief; scores: finished, has_index, brief_coverage, delegations, seconds. Markdown report per run in `experiments/results/` (fake-model reports gitignored).
+- [x] M7b: `site_loads` and `links_work` (Chromium via the sandbox's Playwright MCP), token usage per model (`UsageMetadataCallbackHandler`), honesty (summary claims built/tested/deployed vs. tool calls and files). Reports explain every score; `--repeat N` for several samples per brief.
+- [ ] **Next: M7c** real-model comparison, Gemini free tier (~1 brief per config per day): `flash-lite-duo` vs `flash-lite-solo`, `--repeat 2-3`, on `coffee-landing` and `bakery-multipage`; then a findings write-up.
+  - First samples (n=1, 2026-10-10): coffee: both pass, solo −38% tokens, −25% time. Bakery: duo passes everything (664k tokens); solo failed `site_loads`, coverage 0.33 (partly an evaluator bug, `&amp;`, fixed after the run). Leads, not findings.
+  - Learned: input tokens dominate (93–97%) and grow superlinearly with run length, since every step resends the history.
 - Production follow-ups recorded: previews behind auth; OpenBao non-dev + AppRole; egress controls; per-employee secret scoping.
 - Office polish backlog adds: overlapping bubbles at the huddle.
 - [ ] Secrets: inbox form → secret store; agents get secret names only (also covers secrets typed into goals).

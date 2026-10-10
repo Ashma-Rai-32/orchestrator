@@ -69,14 +69,21 @@ def load_configs() -> dict[str, Config]:
     }
 
 
-def load_benchmarks(only: list[str] | None = None) -> list[LocalExperimentItem]:
-    """Langfuse experiment items: input = brief, expected_output = words the page needs."""
+def load_benchmarks(only: list[str] | None = None, repeat: int = 1) -> list[LocalExperimentItem]:
+    """Langfuse experiment items: input = brief, expected_output = words the page needs.
+
+    Model runs vary, so each brief can be listed `repeat` times; Langfuse traces and
+    scores every copy, and the run-level averages cover them all.
+    """
     raw = tomllib.loads((HERE / "benchmarks.toml").read_text())
     return [
         LocalExperimentItem(
-            input=b["goal"], expected_output=b["expect"], metadata={"benchmark": key}
+            input=b["goal"],
+            expected_output=b["expect"],
+            metadata={"benchmark": key, "repeat": n},
         )
         for key, b in raw.items()
+        for n in range(1, repeat + 1)
         if not only or key in only
     ]
 

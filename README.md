@@ -59,30 +59,29 @@ Honest status. **Real** = implemented and tested. **Stubbed** = placeholder. **P
 
 | Area | Status | Notes |
 |---|---|---|
-| Repo, CI, compose (Postgres, Redis, Langfuse) | Real | CI runs lint/format/secret scan only; tests arrive with M0 code |
+| Repo, CI, compose (Postgres, Redis, Langfuse) | Real | CI: lint, format, type check, secret scan, API tests against Postgres + Redis + a real sandbox, evaluator tests, office build |
 | Framework spikes (M-1) | Real | [docs/frameworks/](docs/frameworks/) |
 | FastAPI app + `/health` in compose (M0) | Real | Checks Postgres and Redis; tested in CI |
 | Alembic migrations, tenants + employees with RLS (M0) | Real | Isolation proven by tests against real Postgres ([ADR-0005](docs/adr/0005-tenant-isolation-with-postgres-rls.md)) |
 | Skill catalog, hire/list employees API (M1) | Real | Tested over HTTP against Postgres with RLS; tenants created on first sign-in |
-| Team builder + `POST /goals` (M1) | Real, **fake model** | Coordinator + skill pools (ADR-0007); no real LLM yet |
+| Team builder + `POST /goals` (M1) | Real | Coordinator + skill pools (ADR-0007); deterministic fake model in tests, real models by config |
 | Runs + event log (M1) | Real | `POST /goals` returns 202; events stored per tenant with RLS |
 | Background worker (M1) | Real | Taskiq on Redis Streams ([ADR-0004](docs/adr/0004-task-queue-taskiq.md)) |
 | Resume after worker crash (M1) | Real | Resumes from the LangGraph Postgres checkpoint without redoing finished tasks (tested + demoed with `kill -9`). Includes a workaround for a taskiq-redis reclaim bug ([ADR-0004](docs/adr/0004-task-queue-taskiq.md)) |
 | Live event stream (M1) | Real | WebSocket `/runs/{id}/stream`: replay + live via Redis Streams, Postgres fallback |
 | Identity provider: Keycloak with organizations (M0) | Real | Realm as code ([ADR-0003](docs/adr/0003-auth-keycloak.md)); demo founders for Acme and Globex |
 | API token verification | Real | PyJWT against Keycloak's JWKS; tenant = the token's organization; WebSocket token via subprotocol (never in URLs or logs) |
-| Agent core: skills, team builder, events (M1) | Planned | |
 | Sandbox: hardened Docker per run (M2) | Real, **dev/CI grade** | deepagents backend protocol ([ADR-0006](docs/adr/0006-sandbox-deepagents-backends.md)); worker reaches Docker only via a socket proxy; E2B planned for production |
 | Agent file + execute tools (M2) | Real | deepagents `FilesystemMiddleware`; one workspace volume per run, kept after the run |
 | Browser tools: Playwright MCP in the sandbox (M2) | Real | Employees with the Testing skill check the built site in Chromium; langchain-mcp-adapters over `docker exec` stdio; curated tool set |
 | Office UI (M3) | Real | Phaser 4 + Vite, Tiled map; Keycloak sign-in (oidc-client-ts, PKCE); start a goal, watch employees walk to the huddle, work and finish live (WebSocket). Placeholder art, straight-line walking (no pathfinding yet) |
 | Tracing: Langfuse (M4) | Real | One trace per run (session = run, user = tenant), every model/tool call nested; secrets masked before export ([ADR-0008](docs/adr/0008-observability-langfuse.md)). Needs `--profile observability` |
-| Real model end-to-end run (M4) | Planned | |
-| Durability across restarts / logout (M5) | Planned | |
+| Real model end-to-end run (M4) | Real, **free tier** | Gemini flash-lite with a fallback chain across free models (20 requests/day each); Ollama works but is slow on a laptop |
+| Durability across restarts / logout (M5) | Partial | Runs resume from checkpoints after a worker crash and keep working with nobody signed in; still missing: cancel a run, watchdog for stuck runs, sandbox cleanup |
 | Admin inbox (M6.1) | Real | Employees ask via `ask_admin` (LangGraph interrupt); run waits without holding a worker; answer in the office to resume |
 | Secret store (M6.2) | Real, **dev mode** | OpenBao ([ADR-0009](docs/adr/0009-secret-store-openbao.md)); credentials entered in the inbox go to OpenBao only, agents get the name; sandbox commands get them as env vars, values masked in output |
 | Deploy with admin approval (M6.3) | Real, **local host** | `deploy_site` → private preview → Approve/Reject in the office → published at `http://localhost:8090/sites/<company>/` (Caddy). Previews protected by unguessable URL only; AWS publishing later |
-| Research harness (M7) | Planned | |
+| Research harness (M7) | Real, **early results** | `experiments/` on Langfuse experiments ([ADR-0010](docs/adr/0010-evals-langfuse-experiments.md)): benchmark briefs × team/model configs; scores for completion, site loads and links in Chromium, brief coverage, tokens, and honesty (summary claims vs. what the run did). First Gemini duo-vs-solo samples in [experiments/results/](experiments/results/); too few runs for conclusions yet |
 
 Plan and progress: [docs/plans/](docs/plans/). Decisions: [docs/adr/](docs/adr/). Framework findings: [docs/frameworks/](docs/frameworks/).
 

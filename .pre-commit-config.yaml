@@ -28,8 +28,8 @@ repos:
     hooks:
       - id: mypy
         name: mypy
-        entry: uv run --frozen mypy apps packages
+        entry: uv run --frozen mypy apps experiments  # add packages once it holds Python
         language: system
         types: [python]
-        files: ^(apps|packages)/
+        files: ^(apps|packages|experiments)/
         pass_filenames: false

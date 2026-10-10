@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0  # upstream publishes no floating v10 tag
         with:
           enable-cache: true
       - run: uv sync --locked
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0  # upstream publishes no floating v10 tag
         with:
           enable-cache: true
       # Each spike test is a PEP 723 script with its own pinned deps. Fake models only.
@@ -102,12 +102,13 @@ jobs:
           --health-cmd "redis-cli ping" --health-interval 3s --health-retries 10
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0  # upstream publishes no floating v10 tag
         with:
           enable-cache: true
       - run: uv sync --locked
       - run: docker build -t staffroom-sandbox:dev sandbox/  # for sandbox backend tests
       - run: uv run pytest apps/api
+      - run: uv run pytest experiments  # evaluator unit tests; no model or Langfuse needed
 
   api-image:
     name: API image builds and is healthy

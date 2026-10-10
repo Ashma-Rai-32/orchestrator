@@ -27,6 +27,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="staffroom_experiments")
     parser.add_argument("config", choices=sorted(configs))
     parser.add_argument("--only", nargs="*", help="benchmark keys (default: all)")
+    parser.add_argument("--repeat", type=int, default=1, help="runs per benchmark (default: 1)")
     args = parser.parse_args()
     config = configs[args.config]
 
@@ -42,7 +43,7 @@ def main() -> int:
     result = get_client().run_experiment(
         name=f"staffroom/{config.name}",
         description=config.description,
-        data=load_benchmarks(args.only),
+        data=load_benchmarks(args.only, args.repeat),
         task=task,
         evaluators=ITEM_EVALUATORS,
         run_evaluators=RUN_EVALUATORS,
@@ -72,7 +73,7 @@ def write_report(config: str, model: str, result: Any) -> Path:
     ]
     for item in result.item_results:
         scores = {e.name: e.value for e in item.evaluations}
-        key = item.item["metadata"]["benchmark"]
+        key = _label(item.item["metadata"])
         lines.append(f"| {key} | " + " | ".join(str(scores.get(n, "")) for n in names) + " |")
     lines += [
         "",
@@ -81,10 +82,14 @@ def write_report(config: str, model: str, result: Any) -> Path:
         "## Why",
     ]
     for item in result.item_results:  # the evaluators' comments explain each score
-        lines += ["", f"**{item.item['metadata']['benchmark']}**"]
+        lines += ["", f"**{_label(item.item['metadata'])}**"]
         lines += [f"- {e.name}: {e.comment}" for e in item.evaluations if e.comment]
     path.write_text("\n".join(lines) + "\n")
     return path
+
+
+def _label(metadata: dict[str, Any]) -> str:
+    return f"{metadata['benchmark']} #{metadata['repeat']}"
 
 
 if __name__ == "__main__":

@@ -1,0 +1,6 @@
+# Fake credentials in tests that prove secrets are redacted/masked.
+# Fingerprints (commit:file:rule:line) ignore exactly these findings; a new key
+# anywhere else, including in the same files, is still reported.
+a13c10d1f5a1b5bd47dc69a6e3dffc2c58eb166b:apps/api/tests/test_observability.py:aws-access-token:15
+a13c10d1f5a1b5bd47dc69a6e3dffc2c58eb166b:apps/api/tests/test_observability.py:generic-api-key:32
+4c75f6b8d8bc5f08445b51dc3162be3cd3c6f85d:apps/api/tests/test_secrets.py:generic-api-key:70

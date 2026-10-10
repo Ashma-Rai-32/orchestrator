@@ -4,9 +4,9 @@
 # ///
 """Dev tool: sign in as a demo founder, hire a small team, start a goal, print events live.
 
-    uv run scripts/watch_run.py "Build me an LLM wrapper website"
-    uv run scripts/watch_run.py --as founder@globex.test "Build a landing page"
-    uv run scripts/watch_run.py --as founder@initech.test --team duo "..."   # small team, local models
+uv run scripts/watch_run.py "Build me an LLM wrapper website"
+uv run scripts/watch_run.py --as founder@globex.test "Build a landing page"
+uv run scripts/watch_run.py --as founder@initech.test --team duo "..."   # small team, local models
 """
 
 import argparse
@@ -18,7 +18,7 @@ import httpx
 import websockets
 
 API = "http://localhost:8000"
-TOKEN_URL = "http://localhost:8080/realms/staffroom/protocol/openid-connect/token"
+TOKEN_URL = "http://localhost:8080/realms/staffroom/protocol/openid-connect/token"  # noqa: S105 (a URL)
 TEAMS = {
     "full": [
         ("Pixel 1", ["react", "css"]),
@@ -33,10 +33,16 @@ TEAMS = {
 
 async def sign_in(http: httpx.AsyncClient, username: str) -> str:
     # DEV ONLY client with password grant (see infra/keycloak/staffroom-realm.json).
-    response = await http.post(TOKEN_URL, data={
-        "grant_type": "password", "client_id": "staffroom-dev-cli",
-        "username": username, "password": "staffroom-dev", "scope": "openid organization",
-    })
+    response = await http.post(
+        TOKEN_URL,
+        data={
+            "grant_type": "password",
+            "client_id": "staffroom-dev-cli",
+            "username": username,
+            "password": "staffroom-dev",
+            "scope": "openid organization",
+        },
+    )
     response.raise_for_status()
     return str(response.json()["access_token"])
 
