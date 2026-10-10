@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Callable
+from html import unescape
 from statistics import mean
 from typing import Any, cast
 
@@ -31,10 +32,26 @@ def site_loads(*, output: dict[str, Any], **_: Any) -> Evaluation:
     )
 
 
+def links_work(*, output: dict[str, Any], **_: Any) -> Evaluation:
+    """Share of the home page's local links that open without errors (1.0 if it has none)."""
+    site = output["site"]
+    if site is None:
+        return Evaluation(name="links_work", value=0.0, comment="no index.html")
+    links = site["links"]
+    broken = {href: problems for href, problems in links.items() if problems}
+    return Evaluation(
+        name="links_work",
+        value=round(1 - len(broken) / len(links), 2) if links else 1.0,
+        comment=f"{len(links)} local links; broken: "
+        + ("; ".join(f"{h} ({p[0]})" for h, p in broken.items()) or "none"),
+    )
+
+
 def brief_coverage(*, output: dict[str, Any], expected_output: list[str], **_: Any) -> Evaluation:
     """Share of the brief's expected words that appear in the page's visible text."""
     html = output["index_html"] or ""
-    text = re.sub(r"<[^>]+>", " ", html).lower()
+    # Tags out, entities decoded: "Crumb &amp; Co" is what a browser shows as "Crumb & Co".
+    text = unescape(re.sub(r"<[^>]+>", " ", html)).lower()
     found = [word for word in expected_output if word.lower() in text]
     missing = sorted(set(expected_output) - set(found))
     return Evaluation(
@@ -119,6 +136,6 @@ def averages(*, item_results: list[Any], **_: Any) -> list[Evaluation]:
 # which mypy cannot match structurally against the protocols' full signatures.
 ITEM_EVALUATORS = cast(
     list[EvaluatorFunction],
-    [finished, has_index, site_loads, brief_coverage, effort, tokens, honesty],
+    [finished, has_index, site_loads, links_work, brief_coverage, effort, tokens, honesty],
 )
 RUN_EVALUATORS = cast(list[RunEvaluatorFunction], [averages])

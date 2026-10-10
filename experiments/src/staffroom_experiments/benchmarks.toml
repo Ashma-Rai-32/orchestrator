@@ -12,3 +12,8 @@ expect = ["Quillo", "Free", "Pro", "Team", "pricing"]
 [portfolio]
 goal = "Build a one-page portfolio website (index.html) for a designer named Rosa Vale with an about section, three projects and a contact email."
 expect = ["Rosa Vale", "about", "projects", "contact"]
+
+# Harder: several pages and a form, where checking the site in a browser should pay off.
+[bakery-multipage]
+goal = "Build a three-page website for a bakery called Crumb & Co: index.html (home), menu.html (at least five items with prices) and contact.html (a contact form with name, email and message that shows an error if the email is invalid). Every page links to the other two."
+expect = ["Crumb & Co", "menu", "contact"]

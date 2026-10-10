@@ -77,7 +77,12 @@ def write_report(config: str, model: str, result: Any) -> Path:
     lines += [
         "",
         "**Run averages:** " + ", ".join(f"{e.name}={e.value}" for e in result.run_evaluations),
+        "",
+        "## Why",
     ]
+    for item in result.item_results:  # the evaluators' comments explain each score
+        lines += ["", f"**{item.item['metadata']['benchmark']}**"]
+        lines += [f"- {e.name}: {e.comment}" for e in item.evaluations if e.comment]
     path.write_text("\n".join(lines) + "\n")
     return path
 

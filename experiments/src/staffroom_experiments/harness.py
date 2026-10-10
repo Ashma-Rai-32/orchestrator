@@ -117,9 +117,8 @@ async def run_brief(config: Config, goal: str, image: str, tracing: bool) -> dic
         site = None
         if entry:
             # /workspace/site/index.html is served at /site/, /workspace/index.html at /.
-            site = await check_site(
-                sandbox.id, entry.path.removeprefix("/workspace").removesuffix("index.html")
-            )
+            path = entry.path.removeprefix("/workspace").removesuffix("index.html")
+            site = await check_site(sandbox.id, path, index_html or "")
     finally:
         await asyncio.to_thread(sandbox.close, keep_workspace=False)
     summary = events[-1].get("summary", "") if events else ""
