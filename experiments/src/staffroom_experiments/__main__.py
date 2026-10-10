@@ -48,8 +48,11 @@ def main() -> int:
         max_concurrency=1,  # one sandbox at a time; free-tier quotas
         metadata={"config": config.name, "model": config.model},
     )
-    report = write_report(config.name, config.model, result)
     shutdown_tracing()
+    if not result.item_results:  # every item raised (e.g. Docker down): no report
+        print("All items failed; see the errors above.")
+        return 1
+    report = write_report(config.name, config.model, result)
     print(result.format())
     print(f"\nreport: {report}")
     return 0

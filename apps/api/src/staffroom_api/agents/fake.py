@@ -21,6 +21,7 @@ from typing import Any
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 
@@ -55,7 +56,7 @@ class RuleBasedFakeModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        return ChatResult(generations=[ChatGeneration(message=self._reply(messages))])
+        return ChatResult(generations=[ChatGeneration(message=self._metered(messages))])
 
     async def _agenerate(
         self,
@@ -65,7 +66,22 @@ class RuleBasedFakeModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         await asyncio.sleep(self.latency_seconds)  # non-blocking, so parallel tasks overlap
-        return ChatResult(generations=[ChatGeneration(message=self._reply(messages))])
+        return ChatResult(generations=[ChatGeneration(message=self._metered(messages))])
+
+    def _metered(self, messages: list[BaseMessage]) -> AIMessage:
+        """Reply with approximate token usage, like a real provider, so cost metrics run keyless."""
+        reply = self._reply(messages)
+        prompt, completion = (
+            count_tokens_approximately(messages),
+            count_tokens_approximately([reply]),
+        )
+        reply.usage_metadata = {
+            "input_tokens": prompt,
+            "output_tokens": completion,
+            "total_tokens": prompt + completion,
+        }
+        reply.response_metadata["model_name"] = "fake"
+        return reply
 
     def _reply(self, messages: list[BaseMessage]) -> AIMessage:
         request = next(str(m.content) for m in reversed(messages) if isinstance(m, HumanMessage))

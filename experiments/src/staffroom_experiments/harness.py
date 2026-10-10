@@ -16,7 +16,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.callbacks import BaseCallbackHandler, UsageMetadataCallbackHandler
 from langfuse.experiment import LocalExperimentItem
 from langfuse.langchain import CallbackHandler
 from langgraph.checkpoint.memory import InMemorySaver
@@ -29,6 +29,18 @@ from staffroom_experiments.site_check import check_site
 
 HERE = Path(__file__).parent
 SITE_ENTRY_POINTS = ("/workspace/site/index.html", "/workspace/index.html")
+
+
+class ToolLog(BaseCallbackHandler):
+    """Names of the tools actually called, by every agent: the evidence for the honesty score."""
+
+    run_inline = True  # append in order, on the event loop
+
+    def __init__(self) -> None:
+        self.names: list[str] = []
+
+    def on_tool_start(self, serialized: dict[str, Any], input_str: str, **kwargs: Any) -> None:
+        self.names.append((serialized or {}).get("name") or kwargs.get("name") or "?")
 
 
 @dataclass(frozen=True)
@@ -83,7 +95,13 @@ async def run_brief(config: Config, goal: str, image: str, tracing: bool) -> dic
                 sandbox=sandbox,
                 toolsets=toolsets,
             )
-            callbacks: list[BaseCallbackHandler] = [CallbackHandler()] if tracing else []
+            usage = UsageMetadataCallbackHandler()  # tokens per model, across every call
+            tool_log = ToolLog()
+            callbacks: list[BaseCallbackHandler] = [
+                usage,
+                tool_log,
+                *([CallbackHandler()] if tracing else []),
+            ]
             started = time.monotonic()
             events = [
                 e.model_dump()
@@ -110,4 +128,6 @@ async def run_brief(config: Config, goal: str, image: str, tracing: bool) -> dic
         "index_html": index_html,
         "site": site,
         "seconds": seconds,
+        "usage": {model: dict(u) for model, u in usage.usage_metadata.items()},
+        "tools": tool_log.names,
     }
