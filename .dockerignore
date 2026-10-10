@@ -9,3 +9,4 @@
 spikes
 docs
 experiments
+!experiments/pyproject.toml

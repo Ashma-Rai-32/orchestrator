@@ -11,6 +11,8 @@ WORKDIR /app
 # Dependencies first, so code changes don't reinstall them.
 COPY pyproject.toml uv.lock ./
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
+# uv validates the lock against every workspace member; experiments is never installed here.
+COPY experiments/pyproject.toml experiments/pyproject.toml
 RUN uv sync --locked --package staffroom-api --no-install-workspace
 
 COPY apps/api apps/api
