@@ -1,7 +1,8 @@
 """CLI: run benchmark briefs against one configuration and write a Markdown report.
 
 uv run python -m staffroom_experiments fake-duo
-uv run python -m staffroom_experiments flash-lite-duo --only coffee-landing
+uv run --env-file .env python -m staffroom_experiments flash-lite-duo --only coffee-landing
+(real models read their API key from .env; uv loads it into the environment)
 """
 
 import argparse

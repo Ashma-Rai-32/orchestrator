@@ -1,7 +1,8 @@
 """Run benchmark briefs against an agent configuration, scored in Langfuse (ADR-0010).
 
     uv run python -m staffroom_experiments fake-duo
-    uv run python -m staffroom_experiments flash-lite-duo --only coffee-landing
+    uv run --env-file .env python -m staffroom_experiments flash-lite-duo --only coffee-landing
+    (real models read their API key from .env; uv loads it into the environment)
 
 The agent system runs in-process (same team builder, sandbox and toolsets as the
 worker); the HTTP API, database, auth and queue are deliberately out of the loop.
